@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "temporal-exploit"
+version = "0.1.0"
+description = "Survival-analysis tooling for temporal CVE weaponization prediction"
+requires-python = ">=3.12"
+dependencies = [
+  "pandas>=2.2.3",
+  "pyarrow>=17.0.0",
+  "numpy>=1.26",
+  "scikit-learn>=1.5.2",
+  "lifelines>=0.30.0",
+  "matplotlib>=3.9",
+  "seaborn>=0.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2", "pytest-cov>=5.0"]
+
+[project.scripts]
+temporal-exploit = "temporal_exploit.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
