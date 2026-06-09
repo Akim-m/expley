@@ -77,3 +77,23 @@ def test_build_first_weaponization_labels_censors_missing_events() -> None:
     assert row["event_source"] == "censored"
     assert pd.isna(row["event_date"])
     assert row["duration_days"] == 29
+
+
+def test_build_first_weaponization_labels_flags_negative_durations() -> None:
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0003"],
+            "published": ["2024-02-01"],
+        }
+    )
+    poc = pd.DataFrame({"cve_id": ["CVE-2024-0003"], "poc_first_seen": ["2024-01-25"]})
+
+    labels = build_first_weaponization_labels(
+        corpus=corpus,
+        event_frames={"poc": (poc, "poc_first_seen")},
+        snapshot_date="2024-03-01",
+    )
+
+    row = labels.iloc[0]
+    assert row["duration_days"] == -7
+    assert bool(row["negative_duration_flag"]) is True
