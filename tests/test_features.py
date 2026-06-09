@@ -1,6 +1,11 @@
 import pandas as pd
 
-from temporal_exploit.features import build_publication_features, has_list_value, list_len
+from temporal_exploit.features import (
+    build_publication_features,
+    feature_provenance,
+    has_list_value,
+    list_len,
+)
 
 
 def test_list_len_handles_lists_tuples_and_missing_values() -> None:
@@ -60,3 +65,11 @@ def test_build_publication_features_handles_missing_lists() -> None:
     assert features.loc[0, "has_weakness"] == 0
     assert features.loc[0, "vendor_count"] == 0
     assert features.loc[0, "product_count"] == 0
+
+
+def test_feature_provenance_documents_safe_feature_families() -> None:
+    provenance = feature_provenance()
+
+    assert set(provenance.columns) == {"feature_family", "source", "leakage_status", "notes"}
+    assert "cvss_v3_base_score" in provenance["feature_family"].tolist()
+    assert set(provenance["leakage_status"]) == {"publication_time_safe"}
