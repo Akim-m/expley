@@ -1,0 +1,31 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Generated data artifacts
+*.parquet
+*.csv.gz
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# Pipeline outputs and caches
+out/
+logs/
+.cache/
+*.log
+*.tmp
+*.checkpoint.json
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
