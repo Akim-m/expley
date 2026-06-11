@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from temporal_exploit.labels import (
+    build_competing_risks_labels,
     build_first_weaponization_labels,
     build_per_signal_labels,
     first_event_per_cve,
@@ -167,3 +168,21 @@ def test_build_per_signal_labels_on_tiny_fixtures(tmp_path: Path) -> None:
     cen = labels.loc[labels["cve_id"] == "CVE-2024-0002"].iloc[0]
     assert bool(cen["poc_observed"]) is False
     assert cen["poc_duration_days"] == 29
+
+
+def test_build_competing_risks_labels_on_tiny_fixtures(tmp_path: Path) -> None:
+    corpus, frames = _tiny_event_frames(tmp_path)
+
+    labels = build_competing_risks_labels(corpus, frames, snapshot_date="2024-03-01")
+
+    win = labels.loc[labels["cve_id"] == "CVE-2024-0001"].iloc[0]
+    assert win["event_cause"] == "poc"
+    assert bool(win["event_observed"]) is True
+    assert win["duration_days"] == 9
+    # sources sorted: kev=1, nuclei=2, poc=3
+    assert win["cause_code"] == 3
+
+    cen = labels.loc[labels["cve_id"] == "CVE-2024-0002"].iloc[0]
+    assert cen["event_cause"] == "censored"
+    assert cen["cause_code"] == 0
+    assert bool(cen["event_observed"]) is False
