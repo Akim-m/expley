@@ -23,6 +23,65 @@ def test_build_dataset_writes_artifacts(tmp_path):
     assert manifest["event_source_rows"]["kev"] == 1
     assert (artifact_dir / "feature_provenance.csv").exists()
 
+    per_signal = pd.read_parquet(artifact_dir / "per_signal_labels.parquet")
+    competing = pd.read_parquet(artifact_dir / "competing_risks_labels.parquet")
+    assert set(per_signal["cve_id"]) == {"CVE-2024-0001", "CVE-2024-0002"}
+    assert "cause_code" in competing.columns
+    assert manifest["per_signal_rows"] == 2
+    assert manifest["competing_risks_rows"] == 2
+    assert manifest["attack_features_enabled"] is False
+    assert manifest["epss_features_enabled"] is False
+
+
+def test_build_dataset_enriches_with_attack(tmp_path):
+    out_dir = tmp_path / "out"
+    artifact_dir = tmp_path / "artifacts"
+    write_tiny_handover(out_dir)
+    chain_path = tmp_path / "technique_cwe_chain.parquet"
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0001"],
+            "technique_id": ["T1059", "T1059.001"],
+        }
+    ).to_parquet(chain_path)
+
+    build_dataset_command(
+        out_dir, artifact_dir, snapshot_date="2024-03-01", technique_chain=chain_path
+    )
+
+    features = pd.read_parquet(artifact_dir / "publication_features.parquet")
+    provenance = pd.read_csv(artifact_dir / "feature_provenance.csv")
+    manifest = json.loads((artifact_dir / "manifest.json").read_text())
+    assert "has_attack_chain_mapping" in features.columns
+    assert (provenance["source"].str.startswith("technique_cwe_chain")).any()
+    assert manifest["attack_features_enabled"] is True
+
+
+def test_build_dataset_enriches_with_epss(tmp_path):
+    out_dir = tmp_path / "out"
+    artifact_dir = tmp_path / "artifacts"
+    write_tiny_handover(out_dir)
+    epss_path = tmp_path / "epss_history.parquet"
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"],
+            "date": pd.to_datetime(["2024-01-05"], utc=True),
+            "epss": [0.42],
+            "percentile": [0.9],
+        }
+    ).to_parquet(epss_path)
+
+    build_dataset_command(
+        out_dir, artifact_dir, snapshot_date="2024-03-01", epss_path=epss_path
+    )
+
+    features = pd.read_parquet(artifact_dir / "publication_features.parquet")
+    provenance = pd.read_csv(artifact_dir / "feature_provenance.csv")
+    manifest = json.loads((artifact_dir / "manifest.json").read_text())
+    assert "epss_at_publication" in features.columns
+    assert (provenance["source"].str.startswith("epss_history")).any()
+    assert manifest["epss_features_enabled"] is True
+
 
 def test_build_dataset_writes_splits_when_cutoff_given(tmp_path):
     out_dir = tmp_path / "out"
@@ -42,12 +101,27 @@ def test_main_build_dataset_smoke(tmp_path):
     out_dir = tmp_path / "out"
     artifact_dir = tmp_path / "artifacts"
     write_tiny_handover(out_dir)
+    chain_path = tmp_path / "technique_cwe_chain.parquet"
+    pd.DataFrame(
+        {"cve_id": ["CVE-2024-0001"], "technique_id": ["T1059"]}
+    ).to_parquet(chain_path)
+    epss_path = tmp_path / "epss_history.parquet"
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"],
+            "date": pd.to_datetime(["2024-01-05"], utc=True),
+            "epss": [0.42],
+            "percentile": [0.9],
+        }
+    ).to_parquet(epss_path)
     main(
         [
             "build-dataset",
             "--out-dir", str(out_dir),
             "--artifact-dir", str(artifact_dir),
             "--snapshot-date", "2024-03-01",
+            "--technique-chain", str(chain_path),
+            "--epss-path", str(epss_path),
         ]
     )
     assert (artifact_dir / "manifest.json").exists()
