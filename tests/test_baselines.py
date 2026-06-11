@@ -35,5 +35,17 @@ def test_kaplan_meier_rejects_negative_duration():
     bad = pd.DataFrame(
         {"duration_days": [-5, 10, 30], "event_observed": [True, True, False]}
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="negative"):
         fit_kaplan_meier(bad)
+
+
+def test_cox_baseline_rejects_negative_duration():
+    bad = pd.DataFrame(
+        {
+            "duration_days": [-5, 10, 30],
+            "event_observed": [True, True, False],
+            "cvss_v3_base": [9.8, 7.5, 5.3],
+        }
+    )
+    with pytest.raises(ValueError, match="negative"):
+        fit_cox_baseline(bad, ["cvss_v3_base"])
