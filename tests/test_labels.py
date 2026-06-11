@@ -43,11 +43,11 @@ def test_build_first_weaponization_labels_uses_earliest_event() -> None:
         }
     )
     poc = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "poc_first_seen": ["2024-01-15"]})
-    kev = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "dateAdded": ["2024-01-20"]})
+    kev = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "kev_date_added": ["2024-01-20"]})
 
     labels = build_first_weaponization_labels(
         corpus=corpus,
-        event_frames={"poc": (poc, "poc_first_seen"), "kev": (kev, "dateAdded")},
+        event_frames={"poc": (poc, "poc_first_seen"), "kev": (kev, "kev_date_added")},
         snapshot_date="2024-03-01",
     )
 
