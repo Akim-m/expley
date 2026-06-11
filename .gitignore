@@ -36,3 +36,7 @@ artifacts/
 models/
 reports/
 .pytmp/
+
+# Live-fetched data
+data/live/
+.fetch_cache/
