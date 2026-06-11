@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from temporal_exploit.baselines import fit_cox_baseline, fit_kaplan_meier
 
@@ -28,3 +29,11 @@ def test_cox_baseline_fits_numeric_feature():
     )
     fitter = fit_cox_baseline(frame, ["cvss_v3_base"])
     assert "cvss_v3_base" in fitter.params_.index
+
+
+def test_kaplan_meier_rejects_negative_duration():
+    bad = pd.DataFrame(
+        {"duration_days": [-5, 10, 30], "event_observed": [True, True, False]}
+    )
+    with pytest.raises(Exception):
+        fit_kaplan_meier(bad)

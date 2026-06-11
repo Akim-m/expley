@@ -89,7 +89,8 @@ CVEs published before the cutoff form the train set, those on or after it form
 the test set. This respects the temporal ordering — a model is only ever
 evaluated on CVEs published later than those it trained on.
 
-The split is **locked**: the CVE IDs are written to `train_cve_ids.txt` and
+The split is **locked**: when a cutoff date is supplied to the build via
+`--cutoff-date`, the CVE IDs are written to `train_cve_ids.txt` and
 `test_cve_ids.txt` alongside a `split_metadata.json` recording the cutoff date
 and the train/test counts. **No random K-fold** splitting is used, because
 random folds would let future CVEs leak into training.
@@ -141,10 +142,11 @@ Beyond the modeling itself, the pipeline adds reliability and auditability:
   missing columns fail loudly instead of silently degrading to empty features.
 - **Artifact manifests** — each dataset build writes a `manifest.json` with the
   snapshot date, row counts, and per-source event counts.
-- **Feature provenance** — every feature family is documented with its source
-  column and leakage status.
-- **Locked splits** — train/test CVE IDs are persisted, making splits
-  reproducible across runs.
+- **Feature provenance** — every build writes `feature_provenance.csv`,
+  documenting each feature family with its source column and leakage status.
+- **Locked splits** — when `--cutoff-date` is supplied, the build writes
+  `train_cve_ids.txt`, `test_cve_ids.txt`, and `split_metadata.json`, making
+  splits reproducible across runs.
 - **Negative-duration flags** — data-quality issues are surfaced and preserved
   rather than dropped.
 

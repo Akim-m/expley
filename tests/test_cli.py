@@ -21,6 +21,21 @@ def test_build_dataset_writes_artifacts(tmp_path):
     assert manifest["snapshot_date"] == "2024-03-01"
     assert manifest["event_source_rows"]["poc"] == 1
     assert manifest["event_source_rows"]["kev"] == 1
+    assert (artifact_dir / "feature_provenance.csv").exists()
+
+
+def test_build_dataset_writes_splits_when_cutoff_given(tmp_path):
+    out_dir = tmp_path / "out"
+    artifact_dir = tmp_path / "artifacts"
+    write_tiny_handover(out_dir)
+
+    build_dataset_command(
+        out_dir, artifact_dir, snapshot_date="2024-03-01", cutoff_date="2024-01-15"
+    )
+
+    assert (artifact_dir / "train_cve_ids.txt").exists()
+    assert (artifact_dir / "test_cve_ids.txt").exists()
+    assert (artifact_dir / "split_metadata.json").exists()
 
 
 def test_main_build_dataset_smoke(tmp_path):
