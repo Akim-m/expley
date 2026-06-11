@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from temporal_exploit.cli import build_dataset_command
+from temporal_exploit.cli import build_dataset_command, main
 from tests.fixtures.tiny_parquets import write_tiny_handover
 
 
@@ -21,3 +21,18 @@ def test_build_dataset_writes_artifacts(tmp_path):
     assert manifest["snapshot_date"] == "2024-03-01"
     assert manifest["event_source_rows"]["poc"] == 1
     assert manifest["event_source_rows"]["kev"] == 1
+
+
+def test_main_build_dataset_smoke(tmp_path):
+    out_dir = tmp_path / "out"
+    artifact_dir = tmp_path / "artifacts"
+    write_tiny_handover(out_dir)
+    main(
+        [
+            "build-dataset",
+            "--out-dir", str(out_dir),
+            "--artifact-dir", str(artifact_dir),
+            "--snapshot-date", "2024-03-01",
+        ]
+    )
+    assert (artifact_dir / "manifest.json").exists()
