@@ -147,3 +147,33 @@ Beyond the modeling itself, the pipeline adds reliability and auditability:
   reproducible across runs.
 - **Negative-duration flags** — data-quality issues are surfaced and preserved
   rather than dropped.
+
+## 11. Observed label composition (snapshot 2026-03-14)
+
+First build over the full handover corpus (338,015 CVEs):
+
+| Event source | Count |
+| --- | --- |
+| censored | 172,539 |
+| poc | 160,873 |
+| metasploit | 2,246 |
+| nuclei | 1,693 |
+| kev | 531 |
+| google_0day | 133 |
+
+- **Observed events:** 165,476 of 338,015 CVEs (~49%); the rest are right-censored
+  at the snapshot.
+- **PoC dominance is extreme:** public PoC accounts for ~97% of observed events.
+  This is the single most important framing caveat — the model overwhelmingly
+  learns *time to public PoC*, not time to confirmed exploitation. KEV and
+  Google 0-day signals are rare (531 and 133 first-events respectively).
+- **Negative durations:** 3,255 CVEs have an event dated before publication
+  (flagged via `negative_duration_flag`, minimum −3,505 days). These must be
+  excluded or analyzed separately before fitting survival models.
+- **Missing CVSS:** 94,508 CVEs (~28%) lack a CVSS v3 base score; these are
+  imputed to 0.0 with the `cvss_v3_missing` indicator set so the imputation is
+  recoverable downstream.
+
+The per-source counts above are first-events-per-CVE (after deduplication and
+earliest-event selection); the manifest's `event_source_rows` instead records
+raw input rows per parquet, so the two differ.
