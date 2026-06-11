@@ -174,6 +174,20 @@ On Windows PowerShell, activate the environment with:
 .\.venv\Scripts\Activate.ps1
 ```
 
+## Modeling quick start
+
+From the repo root:
+
+```bash
+python -m pip install -e ".[dev]"
+temporal-exploit build-dataset --out-dir dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out --artifact-dir artifacts --snapshot-date 2026-03-14
+pytest
+```
+
+Generated artifacts land in `artifacts/` (ignored by Git): `modeling_labels.parquet`,
+`publication_features.parquet`, and `manifest.json`. Methodology is documented in
+`docs/modeling_methodology.md`.
+
 ## Main documentation
 
 Read these in order:
