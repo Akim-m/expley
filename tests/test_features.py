@@ -51,6 +51,33 @@ def test_top_k_cwe_one_hot():
     assert "cwe_CWE-89" not in features.columns  # below top-k
 
 
+def test_cvss_vector_component_one_hots():
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0002", "CVE-2024-0003"],
+            "published": ["2024-01-01", "2024-02-01", "2024-03-01"],
+            "cvss_v3_base": [9.8, 5.0, None],
+            "cvss_v3_severity": ["CRITICAL", "MEDIUM", None],
+            "cvss_v3_vector": [
+                "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                "CVSS:3.0/AV:L/AC:H/PR:L/UI:R/S:C/C:L/I:N/A:N",
+                None,
+            ],
+            "cwe_ids": [[], [], []],
+            "vendors": [[], [], []],
+            "products": [[], [], []],
+        }
+    )
+    features = build_publication_features(corpus)
+    assert features["cvss_av_N"].tolist() == [1, 0, 0]
+    assert features["cvss_av_L"].tolist() == [0, 1, 0]
+    assert features["cvss_ac_L"].tolist() == [1, 0, 0]
+    assert features["cvss_pr_N"].tolist() == [1, 0, 0]
+    assert features["cvss_ui_N"].tolist() == [1, 0, 0]
+    assert features["cvss_s_C"].tolist() == [0, 1, 0]
+    # no-vector row contributes zeros everywhere (cvss_v3_missing already flags it)
+
+
 def test_features_require_real_corpus_columns():
     corpus = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "published": ["2024-01-01"]})
     with pytest.raises(ValueError, match="cvss_v3_base"):

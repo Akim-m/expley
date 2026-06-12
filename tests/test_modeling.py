@@ -149,6 +149,16 @@ def test_feature_matrix_excludes_meta_columns():
     assert y.dtype.names == ("event", "time")
 
 
+def test_fit_cox_drops_rare_one_hots():
+    labels, features = _synthetic(n=120)
+    features["rare_flag"] = 0
+    features.loc[0, "rare_flag"] = 1  # 1 positive in 120 -> unstable covariate
+    frame = prepare_modeling_frame(labels, features)
+    model = fit_cox(frame)
+    assert "rare_flag" not in model.feature_cols_
+    assert "cvss_v3_base" in model.feature_cols_
+
+
 def test_fit_cox_includes_feature():
     labels, features = _synthetic(n=120)
     frame = prepare_modeling_frame(labels, features)

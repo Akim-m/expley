@@ -57,6 +57,16 @@ def test_fit_xgb_aft_and_survival_curve_properties():
     assert (np.diff(surv, axis=1) <= 1e-12).all()  # S(t) non-increasing in t
 
 
+def test_early_stopping_uses_validation_tail():
+    frame = _synthetic(n=400)
+    model = fit_xgb_aft(frame, num_rounds=300, early_stopping_rounds=20)
+    assert getattr(model.booster, "best_iteration", None) is not None
+    assert model.booster.best_iteration < 300
+    X = frame[model.feature_cols_].astype(float)
+    surv = survival_at(model, X, [30], "xgb")
+    assert ((surv >= 0) & (surv <= 1)).all()
+
+
 def test_evaluate_survival_xgb():
     frame = _synthetic()
     train, test = time_split_frame(frame, "2023-09-01")
