@@ -24,6 +24,8 @@ dev = ["pytest>=8.2", "pytest-cov>=5.0", "ruff>=0.8", "pre-commit>=4.0"]
 deep = ["torch>=2.2", "pycox>=0.3", "torchtuples>=0.2"]
 # GPU-capable gradient-boosted AFT model; light install, CUDA optional.
 xgb = ["xgboost>=2.0"]
+# Gradient-boosted competing-risks model (SurvivalBoost, Inria).
+boost = ["hazardous>=0.1"]
 
 [project.scripts]
 temporal-exploit = "temporal_exploit.cli:main"

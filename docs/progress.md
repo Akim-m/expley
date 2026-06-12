@@ -89,7 +89,12 @@ PoC is 97% of events, so a single first-weaponization model mostly learns PoC/di
 Per scope guidance (2026-06-12): stay within the README's defined sources. New external feeds (OSV, GHSA, ExploitDB, VulnCheck API) are **out of the project's main scope** and parked unless explicitly requested. The "more public data" need is met by live-refreshing the README's own sources (workstream C).
 
 ## Scope for improvement (backlog / quality)
-- **Research-driven roadmap (2026-06-12)** — see `docs/research_improvements_2026-06.md` (adversarially verified literature sweep). Priorities: (1) competing-risks/multi-state estimation (Aalen-Johansen CIF baseline → cause-specific Cox per transition → SurvivalBoost) replacing biased independent per-signal probability estimates; (2) landmarked post-publication artifact features (reference counts, PoC repo metadata for downstream transitions — leakage rules per endpoint); (3) broader/de-noised labels (VulnCheck KEV, Exploit-DB verified, honeypot feeds; KEV selection bias is real and measurable).
+- **Research-driven roadmap (2026-06-12)** — see `docs/research_improvements_2026-06.md` (adversarially verified literature sweep). **First implementation wave landed same day** (plan: `docs/superpowers/plans/2026-06-12-competing-risks-and-artifact-features.md`, four parallel subagents on disjoint files):
+  - `competing.py` — Aalen-Johansen CIF (joint, unbiased), cause-specific Cox per transition, clock-restarted `transition_frame` (PoC→Metasploit/Nuclei/KEV), competing-aware `cif_calibration_table`.
+  - `survboost.py` — SurvivalBoost (hazardous 0.1.0, `[boost]` extra) joint competing-risks CIFs; version-guarded sklearn≥1.6 compat patch.
+  - `poc_features.py` — PoC artifact features (count/sources/lag/extension one-hots), provenance `transition_safe_post_poc` (label leakage for the PoC endpoint itself).
+  - `fetch/exploitdb.py` + `fetch/vulncheck.py` — Exploit-DB verified flags and VulnCheck KEV connectors, wired into `fetch --source {exploitdb,vulncheck_kev}`.
+  - Still open from the roadmap: landmarked time-varying design over transitions, CIF-based train-CLI integration (a `train-competing` command), label-noise/FFC adaptation, honeypot feeds.
 - ✅ Artifact content hashes (`artifact_sha256`, SHA-256 per parquet/csv) in `manifest.json` for reproducibility.
 - ✅ Cox proportional-hazards diagnostics — `modeling.cox_ph_assumptions` (per-covariate `proportional_hazard_test`, `violates` flag); folded into `train` `metrics.json` as `cox_ph_assumptions`.
 - Event-source dominance warning emitted at build time when one source >X% of events.

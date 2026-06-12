@@ -42,7 +42,8 @@ sync when work lands.
 - [x] **Time-based locked train/test splits**
 - [x] **Models** — Kaplan-Meier, Cox PH (+ proportional-hazards assumption diagnostics), Random Survival Forest, GPU XGBoost AFT (`--models`), optional GPU DeepSurv (`--deep`)
 - [x] **Evaluation** — IPCW concordance, (integrated) Brier, calibration/reliability plots at 7/30/90/180d, event-rate-by-horizon, cascade order, EPSS reconciliation, build-time source-dominance warning
-- [x] **Live fetch connectors** (refresh each source to today) — CISA KEV, EPSS, NVD 2.0, Nuclei, PoC (Trickest + Nomi-sec), Metasploit, Project Zero 0-day
+- [x] **Live fetch connectors** (refresh each source to today) — CISA KEV, EPSS, NVD 2.0, Nuclei, PoC (Trickest + Nomi-sec), Metasploit, Project Zero 0-day, Exploit-DB, VulnCheck KEV
+- [x] **Competing-risks / multi-state core** — Aalen-Johansen CIFs (unbiased per-cause probabilities), cause-specific Cox per transition, PoC→tooling transition frames, CIF calibration; optional SurvivalBoost (`[boost]` extra); PoC artifact features (transition-safe, provenance-flagged)
 - [x] **Merge layer** — reconcile live deltas onto the handover parquets into a unified dataset the builder consumes
 - [x] **Leakage groundwork** — `text_safety` masking + description freshness-gating, ready for any future NLP feature
 - [x] **Tooling** — CI (ruff + pytest), pre-commit hooks, baked pytest config
