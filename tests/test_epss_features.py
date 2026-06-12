@@ -73,6 +73,13 @@ def test_snapshot_excludes_post_snapshot_readings(tmp_path) -> None:
     assert row["epss_at_publication_missing"] == 1
 
 
+def test_streaming_batches_match_single_batch(tmp_path) -> None:
+    epss_path = _write_epss(tmp_path)
+    single = build_epss_at_publication(_corpus(), epss_path)
+    streamed = build_epss_at_publication(_corpus(), epss_path, batch_size=1)
+    pd.testing.assert_frame_equal(single, streamed)
+
+
 def test_provenance_covers_every_emitted_feature_family(tmp_path) -> None:
     epss_path = _write_epss(tmp_path)
     features = build_epss_at_publication(_corpus(), epss_path)
