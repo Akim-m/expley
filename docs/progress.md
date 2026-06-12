@@ -89,7 +89,7 @@ Per scope guidance (2026-06-12): stay within the README's defined sources. New e
 - ✅ Cox proportional-hazards diagnostics — `modeling.cox_ph_assumptions` (per-covariate `proportional_hazard_test`, `violates` flag); folded into `train` `metrics.json` as `cox_ph_assumptions`.
 - Event-source dominance warning emitted at build time when one source >X% of events.
 - ✅ Calibration / reliability at 7/30/90/180 days — `modeling.calibration_table` (censoring-aware Kaplan-Meier observed rate per predicted-risk bin) + `plot_calibration`; `train` writes `calibration_{cox,rsf}.png` and folds the per-horizon tables into `metrics.json`. Constant-prediction (pre-first-event) bins collapse safely. (Brier already in `evaluate_survival`.)
-- Description-text leakage mitigation (mask KEV/"actively exploited" terms; restrict text features to `last_modified ≤ published + ε`) before any NLP feature.
+- ✅ Description-text leakage mitigation (`text_safety.py`): `mask_leakage_terms` (redacts "actively exploited"/KEV/CISA/etc.) + `description_is_fresh` / `build_safe_descriptions` (blanks descriptions back-edited > ε days after `published`). Groundwork utility — not wired into the build until an NLP feature consumes it.
 - Deep survival models (DeepHit/DeepSurv via pycox) vs Cox, once competing-risks labels exist.
 - ✅ CI workflow (`.github/workflows/ci.yml`: ruff + pytest on push/PR, py3.12) and pre-commit hooks (`.pre-commit-config.yaml`: hygiene hooks + ruff). Ruff lint is pyflakes-only (`F`) — real defects, no reformatting churn.
 - ✅ Pytest workaround baked into `pyproject` `addopts` (`--basetemp=.pytmp -p no:cacheprovider`) + `filterwarnings=["error::FutureWarning"]`, so plain `pytest` runs with the gate on.
