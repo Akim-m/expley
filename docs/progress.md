@@ -57,14 +57,14 @@ Four workstreams from the directive "more public datasets, fetch till now, deal 
 PoC is 97% of events, so a single first-weaponization model mostly learns PoC/disclosure logistics.
 - **A1. ✅ Done.** `build_per_signal_labels` — per-source `{src}_event_date/_observed/_duration_days/_negative_duration_flag`, so each signal is modeled independently. Wired into the CLI (`per_signal_labels.parquet`). Real build: PoC observed 164,761; KEV 1,542; each signal now separable.
 - **A2. ✅ Done.** `build_competing_risks_labels` — long-format `(cve_id, published, duration_days, event_cause, cause_code, event_observed)` for lifelines cause-specific hazards / pycox DeepHit. Deterministic `cause_code` (0==censored). Wired into the CLI (`competing_risks_labels.parquet`).
-- **A3.** Secondary "confirmed in-wild" target = earliest of KEV/Google-0day only (the ~664 true-exploitation events), with explicit small-sample warning in evaluation. *(not started)*
-- **A4.** Cascade analysis helper: PoC→MSF→Nuclei→KEV ordering stats (how often each precedes the next) to motivate multi-state vs independent modeling. *(not started)*
+- **A3. ✅ Done.** `build_in_wild_labels` — secondary survival target using only KEV + Google-0day (PoC excluded). Wired into the CLI (`in_wild_labels.parquet`, manifest `in_wild_observed`). Real build: 1,543 confirmed in-wild events (KEV 1,410 + 0-day 133) vs 336,472 censored.
+- **A4. ✅ Done.** `evaluate.cascade_order_stats` — for adjacent stages (PoC→MSF→Nuclei→KEV), % where stage a precedes stage b among CVEs observed in both, to motivate multi-state vs independent modeling.
 
 ### B. Wire every remaining source
 - **B1. ✅ Done.** ATT&CK-chain features from `technique_cwe_chain` (`attack_features.py`): `has_attack_chain_mapping`, `attack_technique_count`, top-k parent-technique one-hot (parent = technique id with sub-technique stripped — lower dimensionality, no external tactic data needed). Wired into the CLI via `--technique-chain`. Real build: coverage 25.1% (matches MITRE-chain coverage). *Tactic-level aggregation deferred — needs the external ATT&CK technique→tactic map (a fetch, workstream D).*
 - **B2. ✅ Done.** EPSS-at-publication (`epss_features.py`): first EPSS reading on/after each CVE's `published` (leakage-safe), `epss_at_publication_missing` for pre-2021-04-14/absent CVEs. pyarrow predicate pushdown over the 375M-row file. Wired into the CLI via `--epss-path`. Verified against the real 3.9GB file (sane values, ~9s for a small corpus). *Full-corpus EPSS is a heavier run; treat as an opt-in enrichment.*
-- **B3.** EPSS reconciliation report: where snapshot EPSS over/under-estimates observed weaponization (descriptive, RQ4). *(not started)*
-- **B4. vrs_presence** still unused — intended descriptive / censored-rows-only (snapshot leakage). *(not started)*
+- **B3. ✅ Done.** `evaluate.epss_reconciliation` — 2×2 of high-EPSS-at-publication × fast-weaponized (drops EPSS-missing CVEs), for RQ4 (where EPSS over/under-estimates observed weaponization).
+- **B4. ✅ Done.** `vrs_presence` wired as the separate leakage-flagged `presence_snapshot.parquet` (see "Recently landed").
 
 ### C. Fetch data "till now" (live/incremental)
 `src/temporal_exploit/fetch/` package: pluggable connectors that refresh each source to the current date and write to a separate `data/live/` dir (gitignored) without mutating the handover parquets, recording fetch provenance in `fetch_manifest.json`.
