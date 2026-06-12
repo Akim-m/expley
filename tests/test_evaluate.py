@@ -2,6 +2,7 @@ import pandas as pd
 
 from temporal_exploit.evaluate import (
     cascade_order_stats,
+    epss_reconciliation,
     event_rate_by_horizon,
     event_source_counts,
 )
@@ -68,3 +69,30 @@ def test_cascade_order_stats():
 
     assert stats["from_stage"].tolist() == ["poc", "metasploit", "nuclei"]
     assert stats["to_stage"].tolist() == ["metasploit", "nuclei", "kev"]
+
+
+def test_epss_reconciliation():
+    labels = pd.DataFrame(
+        {
+            "cve_id": ["a", "b", "c", "d", "e"],
+            "event_observed": [True, True, False, True, True],
+            "duration_days": [5, 100, 100, 5, 5],
+        }
+    )
+    epss = pd.DataFrame(
+        {
+            "cve_id": ["a", "b", "c", "d", "e"],
+            "epss_at_publication": [0.9, 0.9, 0.1, 0.1, 0.9],
+            "epss_at_publication_missing": [0, 0, 0, 0, 1],
+        }
+    )
+    summary = epss_reconciliation(labels, epss, epss_threshold=0.5, horizon_days=30)
+    q = summary.set_index(["high_epss", "weaponized_fast"])
+
+    # e is missing -> excluded; 4 CVEs remain
+    assert summary["count"].sum() == 4
+    assert q.loc[(True, True), "count"] == 1   # a
+    assert q.loc[(True, False), "count"] == 1  # b
+    assert q.loc[(False, False), "count"] == 1  # c
+    assert q.loc[(False, True), "count"] == 1  # d
+    assert q.loc[(True, True), "pct"] == 25.0
