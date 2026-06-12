@@ -30,6 +30,27 @@ def test_list_len_handles_numpy_arrays():
     assert list_len(np.array([])) == 0
 
 
+def test_top_k_cwe_one_hot():
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0002", "CVE-2024-0003"],
+            "published": ["2024-01-01", "2024-02-01", "2024-03-01"],
+            "cvss_v3_base": [9.8, 5.0, 7.5],
+            "cvss_v3_severity": ["CRITICAL", "MEDIUM", "HIGH"],
+            "cwe_ids": [
+                np.array(["CWE-79", "CWE-89"]),
+                np.array(["CWE-79"]),
+                np.array([]),
+            ],
+            "vendors": [["apache"], [], []],
+            "products": [["httpd"], [], []],
+        }
+    )
+    features = build_publication_features(corpus, top_k_cwes=1)
+    assert features["cwe_CWE-79"].tolist() == [1, 1, 0]
+    assert "cwe_CWE-89" not in features.columns  # below top-k
+
+
 def test_features_require_real_corpus_columns():
     corpus = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "published": ["2024-01-01"]})
     with pytest.raises(ValueError, match="cvss_v3_base"):
