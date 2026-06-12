@@ -30,6 +30,36 @@ The strongest framing is "timeline to public weaponization", not simply
 "real-world exploitation prediction", because most available events are public
 PoC or tooling signals rather than confirmed in-the-wild exploitation.
 
+## Project status
+
+High-level checklist of the modeling package (`src/temporal_exploit/`, which
+reads the handover parquets and writes to `artifacts/`). The detailed,
+always-current tracker is [`docs/progress.md`](docs/progress.md) — keep both in
+sync when work lands.
+
+- [x] **Dataset builder** — first-weaponization, per-signal, competing-risks, and in-wild labels; right-censoring at a snapshot; negative-duration flagging
+- [x] **Leakage-safe features** — CVSS/CWE/CPE counts, ATT&CK-chain, EPSS-at-publication; snapshot presence kept separate; provenance audit trail; manifest with artifact content hashes
+- [x] **Time-based locked train/test splits**
+- [x] **Models** — Kaplan-Meier, Cox PH (+ proportional-hazards assumption diagnostics), Random Survival Forest, optional GPU DeepSurv (pycox)
+- [x] **Evaluation** — IPCW concordance, (integrated) Brier, calibration/reliability plots at 7/30/90/180d, event-rate-by-horizon, cascade order, EPSS reconciliation, build-time source-dominance warning
+- [x] **Live fetch connectors** (refresh each source to today) — CISA KEV, EPSS, NVD 2.0, Nuclei, PoC (Trickest + Nomi-sec), Metasploit, Project Zero 0-day
+- [x] **Merge layer** — reconcile live deltas onto the handover parquets into a unified dataset the builder consumes
+- [x] **Leakage groundwork** — `text_safety` masking + description freshness-gating, ready for any future NLP feature
+- [x] **Tooling** — CI (ruff + pytest), pre-commit hooks, baked pytest config
+
+This realizes steps 2–8 of the plan below; step 1 (handover) is the source material.
+
+## Scope for improvement (for the next agent)
+
+Open threads — the detailed backlog lives in [`docs/progress.md`](docs/progress.md):
+
+- **Metasploit live mine** — connector is built and mock-tested, but the full end-to-end blob clone + `git log -G` (~1 hr over ~3,500 module/CVE pairs) has not been run; the lighter sources are live-verified.
+- **DeepSurv depth** — wire `deep.fit_deepsurv` into the `train` CLI; add a DeepHit competing-risks variant; tune architecture/epochs. Optional `[deep]` extra; CUDA is auto-selected.
+- **NLP features** — `text_safety.py` is ready (leakage masking + freshness gating) but no description-text feature consumes it yet.
+- **Scheduled incremental refresh** — `merge` reconciles deltas, but there is no automated NVD `lastMod`-window pull to keep a live dataset current on a schedule.
+- **Project Zero dates** — the live sheet leaves "Date Discovered" blank for the most recent rows (source-side); consider a disclosure-date fallback.
+- **Environment** — moving the checkout off OneDrive would remove the pytest `--basetemp`/`no:cacheprovider` workaround.
+
 ## Repository layout
 
 ```text

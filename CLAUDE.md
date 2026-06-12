@@ -70,4 +70,5 @@ load_parquet (loaders) → validate_columns (schema) → build_first_weaponizati
 ## Workflow
 
 - TDD: failing test → minimal implementation → green → commit. Tests use the tiny fixtures in `tests/fixtures/tiny_parquets.py`, which mirror the real schemas (tz-aware UTC, ndarray lists). The end-to-end test round-trips through parquet on disk — keep it as the guard against schema drift.
-- `docs/superpowers/plans/` holds implementation plans; `docs/progress.md` tracks status and roadmap.
+- `docs/superpowers/plans/` holds implementation plans; `docs/progress.md` is the detailed living tracker.
+- When work lands, update **both** `docs/progress.md` (detailed) and the README's **Project status** + **Scope for improvement** sections (high-level) so the next agent sees current state and what's left.
