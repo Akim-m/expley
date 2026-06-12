@@ -102,14 +102,35 @@ def test_fetch_pages_until_total_results(monkeypatch):
     ]
     calls = []
 
-    def fake_fetch_json(url):
-        calls.append(url)
+    def fake_fetch_json(url, api_key=None):
+        calls.append((url, api_key))
         return pages[len(calls) - 1]
 
     monkeypatch.setattr(nvd, "_fetch_json", fake_fetch_json)
 
-    frame = NvdConnector().fetch("2024-01-01T00:00:00", "2024-02-01T00:00:00")
+    frame = NvdConnector().fetch(
+        "2024-01-01T00:00:00", "2024-02-01T00:00:00", api_key="secret"
+    )
 
     assert len(frame) == 3
     assert len(calls) == 2
     assert list(frame["cve_id"]) == ["CVE-A", "CVE-B", "CVE-C"]
+    assert all(api_key == "secret" for _, api_key in calls)
+
+
+def test_fetch_stops_on_short_page(monkeypatch):
+    # totalResults overstates what the API returns; an empty page must end the loop
+    pages = [
+        {"totalResults": 100, "resultsPerPage": 1, "vulnerabilities": [_cve(id="CVE-A")]},
+        {"totalResults": 100, "resultsPerPage": 0, "vulnerabilities": []},
+    ]
+    calls = []
+
+    def fake_fetch_json(url, api_key=None):
+        calls.append(url)
+        return pages[min(len(calls) - 1, 1)]
+
+    monkeypatch.setattr(nvd, "_fetch_json", fake_fetch_json)
+    frame = NvdConnector().fetch("2024-01-01T00:00:00", "2024-02-01T00:00:00")
+    assert len(frame) == 1
+    assert len(calls) == 2
