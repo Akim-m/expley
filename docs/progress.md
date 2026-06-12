@@ -88,7 +88,7 @@ Per scope guidance (2026-06-12): stay within the README's defined sources. New e
 - ✅ Artifact content hashes (`artifact_sha256`, SHA-256 per parquet/csv) in `manifest.json` for reproducibility.
 - ✅ Cox proportional-hazards diagnostics — `modeling.cox_ph_assumptions` (per-covariate `proportional_hazard_test`, `violates` flag); folded into `train` `metrics.json` as `cox_ph_assumptions`.
 - Event-source dominance warning emitted at build time when one source >X% of events.
-- Calibration plots (Brier / reliability) at 7/30/90/180 days.
+- ✅ Calibration / reliability at 7/30/90/180 days — `modeling.calibration_table` (censoring-aware Kaplan-Meier observed rate per predicted-risk bin) + `plot_calibration`; `train` writes `calibration_{cox,rsf}.png` and folds the per-horizon tables into `metrics.json`. Constant-prediction (pre-first-event) bins collapse safely. (Brier already in `evaluate_survival`.)
 - Description-text leakage mitigation (mask KEV/"actively exploited" terms; restrict text features to `last_modified ≤ published + ε`) before any NLP feature.
 - Deep survival models (DeepHit/DeepSurv via pycox) vs Cox, once competing-risks labels exist.
 - ✅ CI workflow (`.github/workflows/ci.yml`: ruff + pytest on push/PR, py3.12) and pre-commit hooks (`.pre-commit-config.yaml`: hygiene hooks + ruff). Ruff lint is pyflakes-only (`F`) — real defects, no reformatting churn.

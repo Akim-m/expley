@@ -2,11 +2,13 @@ import numpy as np
 import pandas as pd
 
 from temporal_exploit.modeling import (
+    calibration_table,
     cox_ph_assumptions,
     evaluate_survival,
     feature_matrix,
     fit_cox,
     fit_rsf,
+    plot_calibration,
     prepare_modeling_frame,
     time_split_frame,
 )
@@ -64,6 +66,29 @@ def test_prepare_drops_negative_and_nonpositive_and_inner_merges():
     assert "cvss_v3_base" in frame.columns
     assert "published" in frame.columns
     assert (frame["duration_days"] > 0).all()
+
+
+def test_calibration_table_shape_and_bounds():
+    labels, features = _synthetic(n=200)
+    frame = prepare_modeling_frame(labels, features)
+    cox = fit_cox(frame)
+    table = calibration_table(cox, frame, horizon=90, kind="cox", n_bins=5)
+
+    assert list(table.columns) == ["horizon", "bin_mid", "mean_pred", "observed", "count"]
+    assert len(table) <= 5
+    assert ((table["observed"] >= 0) & (table["observed"] <= 1)).all()
+    assert ((table["mean_pred"] >= 0) & (table["mean_pred"] <= 1)).all()
+    assert table["count"].sum() == len(frame)
+
+
+def test_plot_calibration_writes_png(tmp_path):
+    labels, features = _synthetic(n=200)
+    frame = prepare_modeling_frame(labels, features)
+    cox = fit_cox(frame)
+    tables = {h: calibration_table(cox, frame, horizon=h, kind="cox", n_bins=5) for h in (30, 90)}
+    out = tmp_path / "calibration.png"
+    plot_calibration(tables, out, title="cox")
+    assert out.exists() and out.stat().st_size > 0
 
 
 def test_time_split_frame_partitions_on_cutoff():
