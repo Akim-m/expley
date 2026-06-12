@@ -89,6 +89,7 @@ PoC is 97% of events, so a single first-weaponization model mostly learns PoC/di
 Per scope guidance (2026-06-12): stay within the README's defined sources. New external feeds (OSV, GHSA, ExploitDB, VulnCheck API) are **out of the project's main scope** and parked unless explicitly requested. The "more public data" need is met by live-refreshing the README's own sources (workstream C).
 
 ## Scope for improvement (backlog / quality)
+- **Research-driven roadmap (2026-06-12)** — see `docs/research_improvements_2026-06.md` (adversarially verified literature sweep). Priorities: (1) competing-risks/multi-state estimation (Aalen-Johansen CIF baseline → cause-specific Cox per transition → SurvivalBoost) replacing biased independent per-signal probability estimates; (2) landmarked post-publication artifact features (reference counts, PoC repo metadata for downstream transitions — leakage rules per endpoint); (3) broader/de-noised labels (VulnCheck KEV, Exploit-DB verified, honeypot feeds; KEV selection bias is real and measurable).
 - ✅ Artifact content hashes (`artifact_sha256`, SHA-256 per parquet/csv) in `manifest.json` for reproducibility.
 - ✅ Cox proportional-hazards diagnostics — `modeling.cox_ph_assumptions` (per-covariate `proportional_hazard_test`, `violates` flag); folded into `train` `metrics.json` as `cox_ph_assumptions`.
 - Event-source dominance warning emitted at build time when one source >X% of events.
