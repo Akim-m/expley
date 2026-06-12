@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Running inside WSL Ubuntu?** Follow `docs/superpowers/plans/2026-06-12-wsl-migration.md` first — setup checklist, where the data files live, and the Windows baseline timings to benchmark against. The user moves the data into WSL manually; verify the paths exist before building.
+
 ## What this is
 
 A survival-analysis modeling layer that predicts **when** a published CVE becomes publicly weaponized (time-to-event), built on a pre-extracted multi-source CVE timeline dataset. It complements EPSS (which predicts in-the-wild exploitation probability over a fixed 30-day window) by characterizing the upstream weaponization pipeline: PoC → Metasploit/Nuclei → KEV/0-day.
