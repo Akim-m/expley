@@ -1,8 +1,10 @@
 import json
 
 import pandas as pd
+import pytest
 
 from temporal_exploit.cli import build_dataset_command, main
+from temporal_exploit.fetch import kev
 from tests.fixtures.tiny_parquets import write_tiny_handover
 
 
@@ -155,3 +157,24 @@ def test_main_build_dataset_smoke(tmp_path):
         ]
     )
     assert (artifact_dir / "manifest.json").exists()
+
+
+def test_main_fetch_kev(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        kev,
+        "_fetch_json",
+        lambda url: {
+            "vulnerabilities": [{"cveID": "CVE-2024-0001", "dateAdded": "2024-01-20"}]
+        },
+    )
+    main(["fetch", "--source", "kev", "--live-dir", str(tmp_path)])
+
+    assert (tmp_path / "kev_events.parquet").exists()
+    manifest = json.loads((tmp_path / "fetch_manifest.json").read_text())
+    assert manifest["entries"][0]["source"] == "kev_events"
+    assert manifest["entries"][0]["row_count"] == 1
+
+
+def test_main_fetch_epss_requires_date(tmp_path):
+    with pytest.raises(ValueError, match="--date"):
+        main(["fetch", "--source", "epss", "--live-dir", str(tmp_path)])
