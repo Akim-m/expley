@@ -181,3 +181,57 @@ def test_main_fetch_kev(tmp_path, monkeypatch):
 def test_main_fetch_epss_requires_date(tmp_path):
     with pytest.raises(ValueError, match="--date"):
         main(["fetch", "--source", "epss", "--live-dir", str(tmp_path)])
+
+
+def _synthetic_artifacts(artifact_dir):
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    n = 160
+    cvss = rng.uniform(2.0, 10.0, n)
+    true_time = np.clip(200.0 - 15.0 * cvss + rng.normal(0, 20, n), 1.0, None)
+    censor = rng.uniform(30.0, 250.0, n)
+    duration = np.minimum(true_time, censor)
+    observed = true_time <= censor
+    published = pd.to_datetime("2023-01-01", utc=True) + pd.to_timedelta(
+        rng.integers(0, 700, n), unit="D"
+    )
+    cve_id = [f"CVE-2023-{i:05d}" for i in range(n)]
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "cve_id": cve_id,
+            "published": published,
+            "duration_days": duration,
+            "event_observed": observed,
+            "negative_duration_flag": False,
+        }
+    ).to_parquet(artifact_dir / "modeling_labels.parquet", index=False)
+    pd.DataFrame(
+        {
+            "cve_id": cve_id,
+            "published": published,
+            "cvss_v3_base": cvss,
+            "weakness_count": rng.integers(0, 4, n),
+        }
+    ).to_parquet(artifact_dir / "publication_features.parquet", index=False)
+
+
+def test_train_command_writes_metrics(tmp_path):
+    from temporal_exploit.cli import train_command
+
+    artifact_dir = tmp_path / "artifacts"
+    report_dir = tmp_path / "report"
+    _synthetic_artifacts(artifact_dir)
+
+    metrics = train_command(
+        artifact_dir, "2023-09-01", report_dir, horizons=(7, 30, 90), rsf_sample=10000
+    )
+
+    written = json.loads((report_dir / "metrics.json").read_text())
+    assert written == metrics
+    assert metrics["cox"]["kind"] == "cox"
+    assert metrics["rsf"]["kind"] == "rsf"
+    assert 0.0 <= metrics["cox"]["c_index_ipcw"] <= 1.0
+    assert metrics["naive_event_rate_by_horizon"][0]["horizon_days"] == 7
+    assert metrics["n_train"] + metrics["n_test"] <= 160
