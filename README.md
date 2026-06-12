@@ -47,6 +47,7 @@ sync when work lands.
 - [x] **Merge layer** — reconcile live deltas onto the handover parquets into a unified dataset the builder consumes
 - [x] **Leakage groundwork** — `text_safety` masking + description freshness-gating, ready for any future NLP feature
 - [x] **Tooling** — CI (ruff + pytest), pre-commit hooks, baked pytest config
+- [x] **WSL2 Ubuntu environment** — migrated off OneDrive/Windows (2026-06-12); env managed with uv; EPSS build 2.3× faster; GPU (`cuda:0`) verified
 
 This realizes steps 2–8 of the plan below; step 1 (handover) is the source material.
 
@@ -59,7 +60,7 @@ Open threads — the detailed backlog lives in [`docs/progress.md`](docs/progres
 - **NLP features** — `text_safety.py` is ready (leakage masking + freshness gating) but no description-text feature consumes it yet.
 - **Scheduled incremental refresh** — `merge` reconciles deltas, but there is no automated NVD `lastMod`-window pull to keep a live dataset current on a schedule.
 - **Project Zero dates** — the live sheet leaves "Date Discovered" blank for the most recent rows (source-side); consider a disclosure-date fallback.
-- **Environment** — moving the checkout off OneDrive would remove the pytest `--basetemp`/`no:cacheprovider` workaround.
+- **WSL RAM cap** — WSL currently sees ~7 GB; set `memory=12GB` in `.wslconfig` (+ `wsl --shutdown`) before running RSF (~10 GB) or concurrent heavy jobs.
 
 ## Repository layout
 
@@ -207,12 +208,13 @@ On Windows PowerShell, activate the environment with:
 
 ## Modeling quick start
 
-From the repo root:
+From the repo root (env managed with [uv](https://docs.astral.sh/uv/)):
 
 ```bash
-python -m pip install -e ".[dev]"
-temporal-exploit build-dataset --out-dir dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out --artifact-dir artifacts --snapshot-date 2026-03-14
-pytest
+uv venv --python 3.12 .venv
+uv pip install -p .venv/bin/python -e ".[dev,xgb,boost]"
+.venv/bin/temporal-exploit build-dataset --out-dir dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out --artifact-dir artifacts --snapshot-date 2026-03-14
+.venv/bin/python -m pytest
 ```
 
 Generated artifacts land in `artifacts/` (ignored by Git): `modeling_labels.parquet`,

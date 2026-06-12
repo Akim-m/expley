@@ -33,10 +33,6 @@ temporal-exploit = "temporal_exploit.cli:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-# OneDrive checkout: the default system tmp dir and .pytest_cache hit
-# PermissionError during collection, so relocate basetemp into the repo and
-# disable the cache plugin. Baked in here so plain `pytest` just works.
-addopts = "--basetemp=.pytmp -p no:cacheprovider"
 filterwarnings = ["error::FutureWarning"]
 
 [tool.ruff]

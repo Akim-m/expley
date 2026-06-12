@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Running inside WSL Ubuntu?** Follow `docs/superpowers/plans/2026-06-12-wsl-migration.md` first — setup checklist, where the data files live, and the Windows baseline timings to benchmark against. The user moves the data into WSL manually; verify the paths exist before building.
+> **Environment:** WSL2 Ubuntu (migrated 2026-06-12 — see `docs/superpowers/plans/2026-06-12-wsl-migration.md` for the record and benchmarks). Data lives in the repo: handover parquets under `dataset_extraction-*/dataset_extraction/out/`, the 3.7 GB EPSS history at `epss_history-001.parquet` (repo root). Use **uv** for env/package management (user preference — it's faster). WSL RAM is capped well below the host's 16 GB; check `free -g` before heavy model work.
 
 ## What this is
 
@@ -15,27 +15,27 @@ A survival-analysis modeling layer that predicts **when** a published CVE become
 
 ## Commands
 
-Use the repo venv interpreter (`.venv/`), not the system Python:
+Use the repo venv interpreter (`.venv/`), not the system Python. Manage the env with uv:
 
 ```bash
-# install (editable, with dev deps)
-.venv/Scripts/python.exe -m pip install -e ".[dev]"
+# create env + install (editable, with dev deps)
+uv venv --python 3.12 .venv
+uv pip install -p .venv/bin/python -e ".[dev,xgb,boost]"
 
-# full test suite — the OneDrive basetemp/cache workaround and the
-# FutureWarning gate are baked into pyproject [tool.pytest.ini_options],
-# so plain pytest just works:
-.venv/Scripts/python.exe -m pytest -q
+# full test suite — the FutureWarning gate is baked into
+# pyproject [tool.pytest.ini_options], so plain pytest just works:
+.venv/bin/python -m pytest -q
 
 # single test
-.venv/Scripts/python.exe -m pytest tests/test_labels.py::test_name -v
+.venv/bin/python -m pytest tests/test_labels.py::test_name -v
 
 # build the modeling dataset from the handover parquets
-.venv/Scripts/python.exe -m temporal_exploit.cli build-dataset \
+.venv/bin/python -m temporal_exploit.cli build-dataset \
   --out-dir dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out \
   --artifact-dir artifacts --snapshot-date 2026-03-14 [--cutoff-date 2024-01-01]
 
 # inspect any handover parquet (predicate pushdown — safe on the 375M-row EPSS file)
-.venv/Scripts/python.exe dataset_extraction-20260608T210903Z-3-002/dataset_extraction/view_parquet.py epss_history --schema-only
+.venv/bin/python dataset_extraction-20260608T210903Z-3-002/dataset_extraction/view_parquet.py epss_history --schema-only
 ```
 
 The console script `temporal-exploit` (entry point `temporal_exploit.cli:main`) is available after install.
