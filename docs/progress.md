@@ -92,7 +92,7 @@ Per scope guidance (2026-06-12): stay within the README's defined sources. New e
 - Description-text leakage mitigation (mask KEV/"actively exploited" terms; restrict text features to `last_modified ≤ published + ε`) before any NLP feature.
 - Deep survival models (DeepHit/DeepSurv via pycox) vs Cox, once competing-risks labels exist.
 - CI workflow running the test suite; pre-commit hooks.
-- Replace the `--basetemp`/`no:cacheprovider` pytest workaround with a proper `tmp_path` config or move the checkout off OneDrive.
+- ✅ Pytest workaround baked into `pyproject` `addopts` (`--basetemp=.pytmp -p no:cacheprovider`) + `filterwarnings=["error::FutureWarning"]`, so plain `pytest` runs with the gate on.
 
 ## Conventions
 - TDD, one focused commit per change, two-stage review for non-trivial work.

@@ -19,12 +19,13 @@ Use the repo venv interpreter (`.venv/`), not the system Python:
 # install (editable, with dev deps)
 .venv/Scripts/python.exe -m pip install -e ".[dev]"
 
-# full test suite — on this OneDrive-backed checkout pytest's default tmp dir
-# can hit PermissionError during collection; route basetemp to a writable dir:
-.venv/Scripts/python.exe -m pytest -q --basetemp=.pytmp -p no:cacheprovider
+# full test suite — the OneDrive basetemp/cache workaround and the
+# FutureWarning gate are baked into pyproject [tool.pytest.ini_options],
+# so plain pytest just works:
+.venv/Scripts/python.exe -m pytest -q
 
 # single test
-.venv/Scripts/python.exe -m pytest tests/test_labels.py::test_name -v --basetemp=.pytmp -p no:cacheprovider
+.venv/Scripts/python.exe -m pytest tests/test_labels.py::test_name -v
 
 # build the modeling dataset from the handover parquets
 .venv/Scripts/python.exe -m temporal_exploit.cli build-dataset \
