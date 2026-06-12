@@ -215,6 +215,17 @@ def _synthetic_artifacts(artifact_dir):
             "weakness_count": rng.integers(0, 4, n),
         }
     ).to_parquet(artifact_dir / "publication_features.parquet", index=False)
+    # in-wild target: same schema, sparser events (only the fastest-weaponized observed)
+    in_wild_observed = observed & (duration < 60)
+    pd.DataFrame(
+        {
+            "cve_id": cve_id,
+            "published": published,
+            "duration_days": duration,
+            "event_observed": in_wild_observed,
+            "negative_duration_flag": False,
+        }
+    ).to_parquet(artifact_dir / "in_wild_labels.parquet", index=False)
 
 
 def test_train_command_writes_metrics(tmp_path):
@@ -235,3 +246,33 @@ def test_train_command_writes_metrics(tmp_path):
     assert 0.0 <= metrics["cox"]["c_index_ipcw"] <= 1.0
     assert metrics["naive_event_rate_by_horizon"][0]["horizon_days"] == 7
     assert metrics["n_train"] + metrics["n_test"] <= 160
+    assert metrics["label_set"] == "first_weaponization"
+
+
+def test_train_command_in_wild_label_set(tmp_path):
+    from temporal_exploit.cli import train_command
+
+    artifact_dir = tmp_path / "artifacts"
+    report_dir = tmp_path / "report"
+    _synthetic_artifacts(artifact_dir)
+
+    metrics = train_command(
+        artifact_dir,
+        "2023-09-01",
+        report_dir,
+        horizons=(7, 30, 90),
+        rsf_sample=10000,
+        label_set="in_wild",
+    )
+
+    assert metrics["label_set"] == "in_wild"
+    assert 0.0 <= metrics["cox"]["c_index_ipcw"] <= 1.0
+
+
+def test_train_command_rejects_unknown_label_set(tmp_path):
+    from temporal_exploit.cli import train_command
+
+    artifact_dir = tmp_path / "artifacts"
+    _synthetic_artifacts(artifact_dir)
+    with pytest.raises(ValueError, match="label_set"):
+        train_command(artifact_dir, "2023-09-01", tmp_path / "r", label_set="bogus")

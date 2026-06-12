@@ -5,6 +5,7 @@ Living status + roadmap for the temporal-exploit modeling system. Update as work
 Last updated: 2026-06-12.
 
 ## Recently landed (this initiative)
+- **Modeling & training (E):** `modeling.py` — `prepare_modeling_frame` (drops negative/zero durations), `time_split_frame`, leakage-safe numeric feature matrix, `fit_cox` (lifelines, penalized) + `fit_rsf` (scikit-survival RandomSurvivalForest, sub-sampled), and `evaluate_survival` with IPCW concordance + (integrated) Brier, horizon support-clipping, and tau fallback. `train` CLI subcommand fits both models on a time split and writes `metrics.json` (Cox, RSF, KM reference, naive event-rate). scikit-survival added as a dependency.
 - Project `CLAUDE.md`; this `progress.md` roadmap.
 - Per-signal labels + competing-risks labels (workstream A1/A2) — decouples PoC from in-wild signals.
 - ATT&CK-chain features (B1) and EPSS-at-publication features (B2), both leakage-safe with provenance.
@@ -13,7 +14,7 @@ Last updated: 2026-06-12.
 - CLI `build-dataset` writes `per_signal_labels.parquet`, `competing_risks_labels.parquet`, `presence_snapshot.parquet`; optionally enriches features via `--technique-chain` / `--epss-path`; manifest records which sources were wired.
 - Full real build (all nine sources) validated: corpus 338,015; presence 9,009; ATT&CK coverage 25.1%; presence flags confirmed OUT of the safe features; provenance carries both `publication_time_safe` and `snapshot_leakage`.
 - Gap fixes from review: empty-frame concat FutureWarning eliminated (labels + nvd); EPSS earliest-row NaN-safe; NVD paging hardened against short/zero pages; NVD `cisa_exploit_added` + real `apiKey` header.
-- 67 tests passing (`-W error::FutureWarning`).
+- 82 tests passing (`-W error::FutureWarning`).
 
 ## Done
 
@@ -74,6 +75,10 @@ PoC is 97% of events, so a single first-weaponization model mostly learns PoC/di
 - **C4. ✅ Done.** NVD 2.0 API (`fetch/nvd.py`) → full cve_corpus schema, paged, apiKey header, hardened termination.
 - **C5.** Git-mined sources (Metasploit / Nuclei / Trickest / Nomi-sec) + Project Zero — reuse the handover `enrich/` logic; AV-safe `--no-checkout` clones. *(not started — heavier; handover data already covers these sources, just not to today)*
 - **C6.** Incremental merge: append live deltas onto the handover parquets into a unified `data/live/` dataset the build can consume (NVD `lastMod` windows, EPSS day-append, KEV full-snapshot dedupe). *(not started)*
+
+### E. Modeling & training
+- **E1. ✅ Done.** `modeling.py` + `train` CLI: Cox PH and RandomSurvivalForest on a time split, IPCW c-index and (integrated) Brier with horizon support-clipping, `metrics.json` report.
+- **E2. ✅ Done.** `train --label-set {first_weaponization,in_wild}` selects the labels parquet; `metrics.json` records `label_set`. In-wild target (`in_wild_labels.parquet`, KEV+0-day only) is now trainable — the project's stated meaningful target.
 
 ### D. More publicly available datasets — DESCOPED
 Per scope guidance (2026-06-12): stay within the README's defined sources. New external feeds (OSV, GHSA, ExploitDB, VulnCheck API) are **out of the project's main scope** and parked unless explicitly requested. The "more public data" need is met by live-refreshing the README's own sources (workstream C).
