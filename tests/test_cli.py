@@ -183,6 +183,29 @@ def test_main_fetch_epss_requires_date(tmp_path):
         main(["fetch", "--source", "epss", "--live-dir", str(tmp_path)])
 
 
+def test_main_fetch_nuclei(tmp_path, monkeypatch):
+    from temporal_exploit.fetch import gitmine
+
+    monkeypatch.setattr(gitmine, "shallow_clone", lambda url, dest: None)
+    monkeypatch.setattr(
+        gitmine, "first_add_dates", lambda repo, paths=None: {"http/cves/2021/cve-2021-44228.yaml": 1_600_000_000}
+    )
+    main(
+        [
+            "fetch", "--source", "nuclei",
+            "--live-dir", str(tmp_path / "live"),
+            "--repo", str(tmp_path / "cache"),
+        ]
+    )
+    saved = pd.read_parquet(tmp_path / "live" / "nuclei_dates.parquet")
+    assert set(saved["cve_id"]) == {"CVE-2021-44228"}
+
+
+def test_main_fetch_poc_requires_repo(tmp_path):
+    with pytest.raises(ValueError, match="--repo"):
+        main(["fetch", "--source", "poc", "--live-dir", str(tmp_path)])
+
+
 def test_main_merge_smoke(tmp_path):
     handover = tmp_path / "handover"
     live = tmp_path / "live"
