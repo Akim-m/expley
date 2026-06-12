@@ -12,6 +12,7 @@ dependencies = [
   "pyarrow>=17.0.0",
   "numpy>=1.26",
   "scikit-learn>=1.5.2",
+  "scikit-survival>=0.23",
   "lifelines>=0.30.0",
   "matplotlib>=3.9",
   "seaborn>=0.13",
