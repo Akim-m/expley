@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from temporal_exploit.modeling import (
     calibration_table,
@@ -266,3 +267,100 @@ def test_cox_ph_assumptions_shape_and_sorting():
     assert ((diag["p"] >= 0.0) & (diag["p"] <= 1.0)).all()
     assert diag["violates"].dtype == bool
     assert diag["p"].is_monotonic_increasing
+
+
+def test_evaluate_survival_reports_uncertainty_and_horizon_auc():
+    labels, features = _synthetic(n=300)
+    frame = prepare_modeling_frame(labels, features)
+    train, test = time_split_frame(frame, "2023-09-01")
+    model = fit_cox(train)
+    res = evaluate_survival(model, train, test, horizons=(30, 90))
+
+    # Noether-approximate CI on the c-index: present, ordered, brackets the point
+    lo, hi = res["c_index_ci95"]
+    assert lo < res["c_index_ipcw"] < hi
+    assert res["c_index_se"] > 0
+    assert res["c_index_n_events"] > 0
+
+    # censoring-free per-horizon AUC on the fully-observed subcohort
+    for h in (30, 90):
+        if str(h) in res["horizon_auc"]:
+            assert 0.0 <= res["horizon_auc"][str(h)] <= 1.0
+
+    # IPA (scaled Brier vs the train-KM null model); 1 is perfect, <=0 is no
+    # better than the null
+    for h, ipa in res["ipa"].items():
+        assert ipa <= 1.0
+
+
+def test_horizon_auc_skipped_when_subcohort_has_one_class():
+    labels, features = _synthetic(n=300)
+    # every observed event happens at day 100 — at horizon 30 the fully
+    # observed subcohort has a single class (no event by 30), so no AUC
+    labels["duration_days"] = np.where(labels["event_observed"], 100.0, 500.0)
+    frame = prepare_modeling_frame(labels, features)
+    train, test = time_split_frame(frame, "2023-09-01")
+    model = fit_cox(train)
+    res = evaluate_survival(model, train, test, horizons=(30, 120))
+    assert "30" not in res["horizon_auc"]
+
+
+def test_fit_cox_scales_penalizer_by_event_rate_and_filters_eventless_indicators():
+    labels, features = _synthetic(n=400)
+    # rare events: 5% observed
+    rng = np.random.default_rng(1)
+    labels["event_observed"] = rng.random(400) < 0.05
+    frame = prepare_modeling_frame(labels, features)
+    # indicator with plenty of positives overall but none among events
+    frame["dead_indicator"] = (~frame["event_observed"]).astype(int) * (
+        np.arange(len(frame)) % 2
+    )
+    model = fit_cox(frame, penalizer=0.1)
+    event_rate = frame["event_observed"].mean()
+    assert model.penalizer == pytest.approx(0.1 * event_rate)
+    assert "dead_indicator" not in model.feature_cols_
+
+
+def test_calibration_table_caps_bins_by_event_count():
+    labels, features = _synthetic(n=300)
+    frame = prepare_modeling_frame(labels, features)
+    # only ~25 events -> at most 25//20 = 1 -> floor of 2 bins
+    rng = np.random.default_rng(2)
+    frame["event_observed"] = rng.random(len(frame)) < 0.1
+    pred = rng.random(len(frame))
+    table = calibration_table(pred, frame, horizon=30, n_bins=10)
+    assert len(table) <= 2
+
+
+def test_cox_ph_assumptions_keeps_all_events_when_sampling():
+    labels, features = _synthetic(n=300)
+    frame = prepare_modeling_frame(labels, features)
+    model = fit_cox(frame)
+    # max_rows below n forces sampling; the sample must keep every event row
+    diag = cox_ph_assumptions(model, frame, max_rows=100)
+    assert not diag.empty
+
+
+def test_fit_cox_escalates_penalizer_until_convergence(monkeypatch):
+    import warnings as _w
+
+    import lifelines
+    from lifelines.exceptions import ConvergenceWarning
+
+    labels, features = _synthetic(n=200)
+    frame = prepare_modeling_frame(labels, features)
+
+    seen = []
+    orig_fit = lifelines.CoxPHFitter.fit
+
+    def flaky_fit(self, *args, **kwargs):
+        seen.append(self.penalizer)
+        if len(seen) == 1:  # first attempt "fails"
+            _w.warn("Newton-Raphson failed to converge", ConvergenceWarning)
+        return orig_fit(self, *args, **kwargs)
+
+    monkeypatch.setattr(lifelines.CoxPHFitter, "fit", flaky_fit)
+    model = fit_cox(frame, penalizer=0.1)
+    assert len(seen) == 2
+    assert seen[1] == pytest.approx(seen[0] * 10)
+    assert model.penalizer == pytest.approx(seen[1])

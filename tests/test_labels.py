@@ -256,3 +256,75 @@ def test_build_competing_risks_labels_on_tiny_fixtures(tmp_path: Path) -> None:
     assert cen["event_cause"] == "censored"
     assert cen["cause_code"] == 0
     assert bool(cen["event_observed"]) is False
+
+
+def test_same_day_events_get_half_day_duration_not_zero() -> None:
+    # ~71% of PoCs land on disclosure day; duration 0 was silently dropped by
+    # prepare_modeling_frame's `> 0` filter (11% of first-weap events).
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"],
+            "published": pd.to_datetime(["2024-01-01 01:00"], utc=True),
+        }
+    )
+    poc = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"],
+            "poc_first_seen": pd.to_datetime(["2024-01-01 23:00"], utc=True),
+        }
+    )
+    labels = build_first_weaponization_labels(
+        corpus, {"poc": (poc, "poc_first_seen")}, snapshot_date="2024-03-01"
+    )
+    row = labels.iloc[0]
+    assert bool(row["event_observed"]) is True
+    assert row["duration_days"] == 0.5
+    assert bool(row["negative_duration_flag"]) is False
+
+
+def test_events_after_snapshot_are_censored_at_snapshot() -> None:
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"],
+            "published": pd.to_datetime(["2024-01-01"], utc=True),
+        }
+    )
+    poc = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"],
+            "poc_first_seen": pd.to_datetime(["2024-04-01"], utc=True),  # after snapshot
+        }
+    )
+    labels = build_first_weaponization_labels(
+        corpus, {"poc": (poc, "poc_first_seen")}, snapshot_date="2024-03-01"
+    )
+    row = labels.iloc[0]
+    assert bool(row["event_observed"]) is False
+    assert row["event_source"] == "censored"
+    assert row["duration_days"] == 60  # censored at snapshot, not at the event
+    assert pd.isna(row["event_date"])
+
+
+def test_per_signal_same_day_and_post_snapshot_handling() -> None:
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0002"],
+            "published": pd.to_datetime(["2024-01-01 01:00", "2024-01-01 00:00"], utc=True),
+        }
+    )
+    poc = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0002"],
+            "poc_first_seen": pd.to_datetime(
+                ["2024-01-01 22:00", "2024-04-01 00:00"], utc=True
+            ),
+        }
+    )
+    labels = build_per_signal_labels(
+        corpus, {"poc": (poc, "poc_first_seen")}, snapshot_date="2024-03-01"
+    ).set_index("cve_id")
+    assert labels.loc["CVE-2024-0001", "poc_duration_days"] == 0.5
+    assert bool(labels.loc["CVE-2024-0001", "poc_observed"]) is True
+    # post-snapshot event -> censored at snapshot
+    assert bool(labels.loc["CVE-2024-0002", "poc_observed"]) is False
+    assert labels.loc["CVE-2024-0002", "poc_duration_days"] == 60

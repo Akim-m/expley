@@ -49,7 +49,8 @@ sync when work lands.
 - [x] **Tooling** — CI (ruff + pytest), pre-commit hooks, baked pytest config
 - [x] **WSL2 Ubuntu environment** — migrated off OneDrive/Windows (2026-06-12); env managed with uv; EPSS build 2.3× faster; GPU (`cuda:0`) verified
 - [x] **Full-feature baseline** — artifacts rebuilt with EPSS-at-publication + CWE + CVSS-vector features (72 cols); xgb early-stopping regression fixed (now opt-in). First-weaponization c-index: **xgb 0.607**, cox 0.588 (cutoff 2024-01-01)
-- [x] **Landmark features** (`--landmarks` / `train --landmark`) — tooling presence + EPSS as-of `published+L`, clock restarted at L. In-wild L=30 same-risk-set ablation: **cox 0.819→0.874** (~190 test events; CIs pending, see `docs/audit_2026-06-12.md`)
+- [x] **Landmark features** (`--landmarks` / `train --landmark`) — tooling presence + EPSS as-of `published+L`, clock restarted at L
+- [x] **Statistical-validity wave** (`docs/audit_2026-06-12.md`) — same-day events kept (0.5d), post-snapshot events censored, c-index CIs, censoring-free horizon AUC, IPA, event-rate-scaled Cox penalizer with convergence escalation, KEV-clock filter for in-wild. **Honest headlines: first-weap xgb 0.598 [0.593,0.602]; in-wild static cox 0.849 [0.805,0.893]; in-wild landmark L=30 cox 0.873 [0.810,0.936]** (cutoff 2024-01-01)
 
 This realizes steps 2–8 of the plan below; step 1 (handover) is the source material.
 
@@ -57,7 +58,7 @@ This realizes steps 2–8 of the plan below; step 1 (handover) is the source mat
 
 Open threads — the detailed backlog lives in [`docs/progress.md`](docs/progress.md):
 
-- **Statistical-validity wave** — prioritized fixes from `docs/audit_2026-06-12.md`: same-day (duration-0) events silently dropped (26% of in-wild events), post-snapshot events unclipped, bootstrap CIs for c-index, IPCW degeneracy under administrative censoring, event-rate-scaled Cox penalizer, calibration min-events guard, KEV backfill clock correction.
+- **Audit leftovers** (`docs/audit_2026-06-12.md`, P0/P1 landed) — bootstrap CIs (Noether approximation shipped instead), exact truncated c-index, mixture-cure framing for long horizons, transition-report c-index null. In-wild calibration: ranking is good but IPA ≈ 0 — absolute probabilities need work (penalizer tuning / cure model).
 - **In-wild label broadening** — Exploit-DB / VulnCheck-KEV connectors exist but their labels aren't merged into `in_wild_labels` (1,543 events vs 336k censored is the binding constraint); honeypot feeds unwired.
 - **CIF-based headline evaluation** — `train-competing` computes unbiased Aalen-Johansen CIFs, but the default report still uses independent-KM per-signal probabilities (inflated).
 
