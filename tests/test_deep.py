@@ -45,3 +45,10 @@ def test_fit_and_evaluate_deepsurv():
     assert res["kind"] == "deepsurv"
     assert 0.0 <= res["concordance_td"] <= 1.0
     assert res["integrated_brier"] >= 0.0
+
+
+def test_evaluate_deepsurv_caps_eval_rows():
+    train, test = _frame(seed=0), _frame(seed=1)
+    model = fit_deepsurv(train, epochs=8, batch_size=128)
+    res = evaluate_deepsurv(model, test, max_eval=50)
+    assert res["n_test"] == 50
