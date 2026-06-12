@@ -10,6 +10,7 @@ from temporal_exploit.modeling import (
     fit_rsf,
     plot_calibration,
     prepare_modeling_frame,
+    survival_at,
     time_split_frame,
 )
 
@@ -68,11 +69,16 @@ def test_prepare_drops_negative_and_nonpositive_and_inner_merges():
     assert (frame["duration_days"] > 0).all()
 
 
+def _pred_event(model, frame, horizon, kind):
+    X = frame[list(model.feature_cols_)].astype(float)
+    return 1.0 - survival_at(model, X, [horizon], kind)[:, 0]
+
+
 def test_calibration_table_shape_and_bounds():
     labels, features = _synthetic(n=200)
     frame = prepare_modeling_frame(labels, features)
     cox = fit_cox(frame)
-    table = calibration_table(cox, frame, horizon=90, kind="cox", n_bins=5)
+    table = calibration_table(_pred_event(cox, frame, 90, "cox"), frame, horizon=90, n_bins=5)
 
     assert list(table.columns) == ["horizon", "bin_mid", "mean_pred", "observed", "count"]
     assert len(table) <= 5
@@ -85,10 +91,41 @@ def test_plot_calibration_writes_png(tmp_path):
     labels, features = _synthetic(n=200)
     frame = prepare_modeling_frame(labels, features)
     cox = fit_cox(frame)
-    tables = {h: calibration_table(cox, frame, horizon=h, kind="cox", n_bins=5) for h in (30, 90)}
+    tables = {
+        h: calibration_table(_pred_event(cox, frame, h, "cox"), frame, horizon=h, n_bins=5)
+        for h in (30, 90)
+    }
     out = tmp_path / "calibration.png"
     plot_calibration(tables, out, title="cox")
     assert out.exists() and out.stat().st_size > 0
+
+
+def test_survival_at_rsf_batching_matches_single_pass():
+    labels, features = _synthetic(n=140)
+    frame = prepare_modeling_frame(labels, features)
+    train, test = time_split_frame(frame, "2023-09-01")
+    model = fit_rsf(train, n_estimators=10, max_samples=10000)
+    X = test[model.feature_cols_].astype(float)
+
+    full = survival_at(model, X, [7, 30, 90], "rsf", batch_size=10_000)
+    batched = survival_at(model, X, [7, 30, 90], "rsf", batch_size=7)
+    assert np.allclose(full, batched)
+
+
+def test_survival_at_rsf_step_semantics():
+    labels, features = _synthetic(n=140)
+    frame = prepare_modeling_frame(labels, features)
+    train, _ = time_split_frame(frame, "2023-09-01")
+    model = fit_rsf(train, n_estimators=10, max_samples=10000)
+    X = train[model.feature_cols_].astype(float).iloc[:5]
+
+    times = model.unique_times_
+    before_first = float(times[0]) / 2.0
+    surv = survival_at(model, X, [before_first, float(times[-1]) + 1000.0], "rsf")
+    full = model.predict_survival_function(X, return_array=True)
+
+    assert np.allclose(surv[:, 0], 1.0)  # before first event time S(t) == 1
+    assert np.allclose(surv[:, 1], full[:, -1])  # beyond support: last value
 
 
 def test_time_split_frame_partitions_on_cutoff():
@@ -163,6 +200,25 @@ def test_evaluate_survival_rsf():
     assert res["kind"] == "rsf"
     assert 0.0 <= res["c_index_ipcw"] <= 1.0
     assert isinstance(res["brier"], dict)
+
+
+def test_evaluate_survival_accepts_precomputed_survival():
+    labels, features = _synthetic(n=140)
+    frame = prepare_modeling_frame(labels, features)
+    train, test = time_split_frame(frame, "2023-09-01")
+    model = fit_rsf(train, n_estimators=10, max_samples=10000)
+    X = test[model.feature_cols_].astype(float)
+    horizons = (7, 30, 90)
+    surv = survival_at(model, X, list(horizons), "rsf")
+
+    fresh = evaluate_survival(model, train, test, horizons=horizons, kind="rsf")
+    reused = evaluate_survival(
+        model, train, test, horizons=horizons, kind="rsf", surv_at_horizons=surv
+    )
+    # parallel tree accumulation is non-associative -> compare with tolerance
+    for h in fresh["brier"]:
+        assert np.isclose(fresh["brier"][h], reused["brier"][h])
+    assert np.isclose(fresh["c_index_ipcw"], reused["c_index_ipcw"])
 
 
 def test_evaluate_survival_skips_out_of_support_horizon():

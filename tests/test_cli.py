@@ -337,6 +337,40 @@ def test_train_command_writes_metrics(tmp_path):
     assert metrics["label_set"] == "first_weaponization"
 
 
+def test_train_command_model_selection(tmp_path):
+    import pytest
+
+    pytest.importorskip("xgboost")
+    from temporal_exploit.cli import train_command
+
+    artifact_dir = tmp_path / "artifacts"
+    report_dir = tmp_path / "report"
+    _synthetic_artifacts(artifact_dir)
+
+    metrics = train_command(
+        artifact_dir, "2023-09-01", report_dir, horizons=(7, 30, 90),
+        models=("cox", "xgb"),
+    )
+
+    assert metrics["xgb"]["kind"] == "xgb"
+    assert "rsf" not in metrics
+    assert (report_dir / "calibration_xgb.png").exists()
+    assert not (report_dir / "calibration_rsf.png").exists()
+
+
+def test_train_command_rejects_unknown_model(tmp_path):
+    import pytest
+
+    from temporal_exploit.cli import train_command
+
+    artifact_dir = tmp_path / "artifacts"
+    _synthetic_artifacts(artifact_dir)
+    with pytest.raises(ValueError, match="unknown models"):
+        train_command(
+            artifact_dir, "2023-09-01", tmp_path / "report", models=("cox", "bogus")
+        )
+
+
 def test_train_command_in_wild_label_set(tmp_path):
     from temporal_exploit.cli import train_command
 
