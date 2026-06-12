@@ -183,6 +183,33 @@ def test_main_fetch_epss_requires_date(tmp_path):
         main(["fetch", "--source", "epss", "--live-dir", str(tmp_path)])
 
 
+def test_main_merge_smoke(tmp_path):
+    handover = tmp_path / "handover"
+    live = tmp_path / "live"
+    out = tmp_path / "unified"
+    handover.mkdir()
+    live.mkdir()
+    pd.DataFrame(
+        {"cve_id": ["CVE-1"], "kev_date_added": pd.to_datetime(["2024-02-01"], utc=True)}
+    ).to_parquet(handover / "kev_events.parquet", index=False)
+    pd.DataFrame(
+        {"cve_id": ["CVE-2"], "kev_date_added": pd.to_datetime(["2024-03-01"], utc=True)}
+    ).to_parquet(live / "kev_events.parquet", index=False)
+
+    main(
+        [
+            "merge",
+            "--handover-dir", str(handover),
+            "--live-dir", str(live),
+            "--out-dir", str(out),
+        ]
+    )
+
+    merged = pd.read_parquet(out / "kev_events.parquet")
+    assert set(merged["cve_id"]) == {"CVE-1", "CVE-2"}
+    assert (out / "merge_manifest.json").exists()
+
+
 def _synthetic_artifacts(artifact_dir):
     import numpy as np
 

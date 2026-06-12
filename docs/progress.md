@@ -73,8 +73,8 @@ PoC is 97% of events, so a single first-weaponization model mostly learns PoC/di
 - **C2. ✅ Done.** CISA KEV live (`fetch/kev.py`). Verified live (1,618 rows to yesterday).
 - **C3. ✅ Done.** FIRST.org EPSS daily CSV.gz (`fetch/epss.py`) → epss_history schema for a given day.
 - **C4. ✅ Done.** NVD 2.0 API (`fetch/nvd.py`) → full cve_corpus schema, paged, apiKey header, hardened termination.
-- **C5.** Git-mined sources (Metasploit / Nuclei / Trickest / Nomi-sec) + Project Zero — reuse the handover `enrich/` logic; AV-safe `--no-checkout` clones. *(not started — heavier; handover data already covers these sources, just not to today)*
-- **C6.** Incremental merge: append live deltas onto the handover parquets into a unified `data/live/` dataset the build can consume (NVD `lastMod` windows, EPSS day-append, KEV full-snapshot dedupe). *(not started)*
+- **C5.** Git-mined sources (Metasploit / Nuclei / Trickest / Nomi-sec) + Project Zero — reuse the handover `enrich/` logic; AV-safe `--no-checkout` clones. *(deferred — needs gigabyte `--no-checkout` clones and ~1hr mining runs that can't be exercised/verified in the dev sandbox; handover data already covers these sources, just not to today. The merge layer (C6) is ready to consume their deltas once produced.)*
+- **C6. ✅ Done.** `merge.py` + `merge` CLI: `merge_live(handover_dir, live_dir, out_dir)` reconciles live deltas onto the handover parquets into a unified dir the build can consume — KEV full-snapshot (earliest `kev_date_added`), NVD corpus by newest `last_modified`, EPSS day-append by `(cve_id, date)`. Unmerged sources file-copy through (the 375M-row EPSS handover is never loaded unless it is the source being merged). Records per-source row deltas in `merge_manifest.json`.
 
 ### E. Modeling & training
 - **E1. ✅ Done.** `modeling.py` + `train` CLI: Cox PH and RandomSurvivalForest on a time split, IPCW c-index and (integrated) Brier with horizon support-clipping, `metrics.json` report.
