@@ -260,6 +260,16 @@ def test_main_merge_smoke(tmp_path):
     assert (out / "merge_manifest.json").exists()
 
 
+def test_main_fetch_zeroday(tmp_path, monkeypatch):
+    from temporal_exploit.fetch import zeroday
+
+    csv = "CVE,Vendor,Product,Type,Date Discovered,Date Patched\nCVE-2021-0001,V,P,RCE,2021-01-05,2021-02-01\n"
+    monkeypatch.setattr(zeroday, "_fetch_csv", lambda url: csv)
+    main(["fetch", "--source", "zeroday", "--live-dir", str(tmp_path / "live")])
+    saved = pd.read_parquet(tmp_path / "live" / "google_0day.parquet")
+    assert set(saved["cve_id"]) == {"CVE-2021-0001"}
+
+
 def _synthetic_artifacts(artifact_dir):
     import numpy as np
 
