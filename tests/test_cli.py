@@ -83,6 +83,36 @@ def test_build_dataset_enriches_with_epss(tmp_path):
     assert manifest["epss_features_enabled"] is True
 
 
+def test_build_dataset_writes_presence_snapshot(tmp_path):
+    out_dir = tmp_path / "out"
+    artifact_dir = tmp_path / "artifacts"
+    write_tiny_handover(out_dir)
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"],
+            "in_metasploit": [True],
+            "in_nuclei": [False],
+            "in_vulncheck_kev": [True],
+            "in_google_zeroday": [False],
+        }
+    ).to_parquet(out_dir / "vrs_presence.parquet")
+
+    build_dataset_command(out_dir, artifact_dir, snapshot_date="2024-03-01")
+
+    presence = pd.read_parquet(artifact_dir / "presence_snapshot.parquet")
+    for flag in ["in_metasploit", "in_nuclei", "in_vulncheck_kev", "in_google_zeroday"]:
+        assert flag in presence.columns
+    provenance = pd.read_csv(artifact_dir / "feature_provenance.csv")
+    assert (provenance["leakage_status"] == "snapshot_leakage").any()
+
+    features = pd.read_parquet(artifact_dir / "publication_features.parquet")
+    assert "in_metasploit" not in features.columns
+
+    manifest = json.loads((artifact_dir / "manifest.json").read_text())
+    assert manifest["presence_available"] is True
+    assert manifest["presence_rows"] == 1
+
+
 def test_build_dataset_writes_splits_when_cutoff_given(tmp_path):
     out_dir = tmp_path / "out"
     artifact_dir = tmp_path / "artifacts"
