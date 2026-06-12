@@ -8,9 +8,12 @@ Last updated: 2026-06-12.
 - Project `CLAUDE.md`; this `progress.md` roadmap.
 - Per-signal labels + competing-risks labels (workstream A1/A2) — decouples PoC from in-wild signals.
 - ATT&CK-chain features (B1) and EPSS-at-publication features (B2), both leakage-safe with provenance.
-- CLI `build-dataset` now writes `per_signal_labels.parquet` + `competing_risks_labels.parquet` and optionally enriches features via `--technique-chain` / `--epss-path`; manifest records which sources were wired.
-- Gap fixes: empty-frame concat FutureWarning eliminated; EPSS earliest-row selection made NaN-safe.
-- 49 tests passing (`-W error::FutureWarning`).
+- **`vrs_presence` wired (B4)** — the last unused handover source — as a separate, leakage-flagged `presence_snapshot.parquet` (never merged into the safe features). **All nine handover sources are now used in the dataset.**
+- **Fetch layer (C):** `Connector` interface + live connectors for **CISA KEV, EPSS-daily, NVD 2.0** + a `temporal-exploit fetch` CLI subcommand. Live KEV fetch verified against CISA — pulled 1,618 entries dated to yesterday (handover had 1,542).
+- CLI `build-dataset` writes `per_signal_labels.parquet`, `competing_risks_labels.parquet`, `presence_snapshot.parquet`; optionally enriches features via `--technique-chain` / `--epss-path`; manifest records which sources were wired.
+- Full real build (all nine sources) validated: corpus 338,015; presence 9,009; ATT&CK coverage 25.1%; presence flags confirmed OUT of the safe features; provenance carries both `publication_time_safe` and `snapshot_leakage`.
+- Gap fixes from review: empty-frame concat FutureWarning eliminated (labels + nvd); EPSS earliest-row NaN-safe; NVD paging hardened against short/zero pages; NVD `cisa_exploit_added` + real `apiKey` header.
+- 67 tests passing (`-W error::FutureWarning`).
 
 ## Done
 
@@ -64,18 +67,16 @@ PoC is 97% of events, so a single first-weaponization model mostly learns PoC/di
 - **B4. vrs_presence** still unused — intended descriptive / censored-rows-only (snapshot leakage). *(not started)*
 
 ### C. Fetch data "till now" (live/incremental)
-New `src/temporal_exploit/fetch/` package: pluggable connectors that refresh each source to the current date, append to the handover parquets without mutating originals (write to a separate `data/live/` dir), and record fetch provenance (source, fetched_utc, row delta) in a manifest.
-- **C1.** Connector interface + manifest + caching/rate-limit handling. Network calls mocked in tests.
-- **C2.** CISA KEV live (single public JSON, no auth) — simplest, establishes the pattern.
-- **C3.** FIRST.org EPSS live (daily CSV.gz API) — extends `epss_history` to today.
-- **C4.** NVD 2.0 API (CVE corpus refresh; needs `lastModStartDate` paging, optional API key, 6s/30s rate limits).
-- **C5.** Git-mined sources (Metasploit / Nuclei / Trickest / Nomi-sec) — reuse the handover `enrich/` logic; AV-safe `--no-checkout` clones.
+`src/temporal_exploit/fetch/` package: pluggable connectors that refresh each source to the current date and write to a separate `data/live/` dir (gitignored) without mutating the handover parquets, recording fetch provenance in `fetch_manifest.json`.
+- **C1. ✅ Done.** `Connector` ABC + `save` + `write_fetch_manifest`. Network isolated in module-level `_fetch_*` fns (mocked in tests).
+- **C2. ✅ Done.** CISA KEV live (`fetch/kev.py`). Verified live (1,618 rows to yesterday).
+- **C3. ✅ Done.** FIRST.org EPSS daily CSV.gz (`fetch/epss.py`) → epss_history schema for a given day.
+- **C4. ✅ Done.** NVD 2.0 API (`fetch/nvd.py`) → full cve_corpus schema, paged, apiKey header, hardened termination.
+- **C5.** Git-mined sources (Metasploit / Nuclei / Trickest / Nomi-sec) + Project Zero — reuse the handover `enrich/` logic; AV-safe `--no-checkout` clones. *(not started — heavier; handover data already covers these sources, just not to today)*
+- **C6.** Incremental merge: append live deltas onto the handover parquets into a unified `data/live/` dataset the build can consume (NVD `lastMod` windows, EPSS day-append, KEV full-snapshot dedupe). *(not started)*
 
-### D. More publicly available datasets (new sources)
-- **D1.** OSV.dev — cross-ecosystem advisories with affected version ranges + references (public API, no auth). Adds non-NVD coverage and earlier PoC/fix references.
-- **D2.** GitHub Security Advisories (GHSA) — GraphQL API; CWE, severity, references, withdrawal dates.
-- **D3.** ExploitDB — public CSV of exploit publication dates per CVE; a sixth dated weaponization signal (real exploits, not just PoC index entries).
-- **D4.** (stretch) VulnCheck Community / KEV API, CISA KEV "known ransomware" flag enrichment.
+### D. More publicly available datasets — DESCOPED
+Per scope guidance (2026-06-12): stay within the README's defined sources. New external feeds (OSV, GHSA, ExploitDB, VulnCheck API) are **out of the project's main scope** and parked unless explicitly requested. The "more public data" need is met by live-refreshing the README's own sources (workstream C).
 
 ## Scope for improvement (backlog / quality)
 - Artifact content hashes in `manifest.json` for reproducibility.
