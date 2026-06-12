@@ -5,6 +5,7 @@ import pandas as pd
 from temporal_exploit.labels import (
     build_competing_risks_labels,
     build_first_weaponization_labels,
+    build_in_wild_labels,
     build_per_signal_labels,
     first_event_per_cve,
 )
@@ -168,6 +169,75 @@ def test_build_per_signal_labels_on_tiny_fixtures(tmp_path: Path) -> None:
     cen = labels.loc[labels["cve_id"] == "CVE-2024-0002"].iloc[0]
     assert bool(cen["poc_observed"]) is False
     assert cen["poc_duration_days"] == 29
+
+
+def test_build_in_wild_labels_prefers_kev_over_poc() -> None:
+    corpus = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "published": ["2024-01-01"]})
+    poc = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "poc_first_seen": ["2024-01-10"]})
+    kev = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "kev_date_added": ["2024-01-20"]})
+    zd = pd.DataFrame(
+        {"cve_id": [], "zeroday_date_discovered": pd.to_datetime([], utc=True)}
+    )
+
+    labels = build_in_wild_labels(
+        corpus,
+        {
+            "poc": (poc, "poc_first_seen"),
+            "kev": (kev, "kev_date_added"),
+            "google_0day": (zd, "zeroday_date_discovered"),
+        },
+        snapshot_date="2024-03-01",
+    )
+
+    row = labels.iloc[0]
+    assert row["event_source"] == "kev"
+    assert row["event_date"] == pd.Timestamp("2024-01-20", tz="UTC")
+    assert row["duration_days"] == 19
+
+
+def test_build_in_wild_labels_censors_poc_only_cve() -> None:
+    corpus = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "published": ["2024-01-01"]})
+    poc = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "poc_first_seen": ["2024-01-10"]})
+
+    labels = build_in_wild_labels(
+        corpus,
+        {"poc": (poc, "poc_first_seen")},
+        snapshot_date="2024-03-01",
+    )
+
+    row = labels.iloc[0]
+    assert bool(row["event_observed"]) is False
+    assert row["event_source"] == "censored"
+    assert pd.isna(row["event_date"])
+
+
+def test_build_in_wild_labels_source_subset() -> None:
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0002"],
+            "published": ["2024-01-01", "2024-02-01"],
+        }
+    )
+    poc = pd.DataFrame(
+        {"cve_id": ["CVE-2024-0001", "CVE-2024-0002"], "poc_first_seen": ["2024-01-05", "2024-02-05"]}
+    )
+    kev = pd.DataFrame({"cve_id": ["CVE-2024-0001"], "kev_date_added": ["2024-01-20"]})
+    zd = pd.DataFrame(
+        {"cve_id": ["CVE-2024-0002"], "zeroday_date_discovered": ["2024-02-10"]}
+    )
+
+    labels = build_in_wild_labels(
+        corpus,
+        {
+            "poc": (poc, "poc_first_seen"),
+            "kev": (kev, "kev_date_added"),
+            "google_0day": (zd, "zeroday_date_discovered"),
+        },
+        snapshot_date="2024-03-01",
+    )
+
+    assert set(labels["event_source"]) <= {"kev", "google_0day", "censored"}
+    assert "poc" not in set(labels["event_source"])
 
 
 def test_build_competing_risks_labels_on_tiny_fixtures(tmp_path: Path) -> None:

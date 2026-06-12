@@ -27,10 +27,13 @@ def test_build_dataset_writes_artifacts(tmp_path):
 
     per_signal = pd.read_parquet(artifact_dir / "per_signal_labels.parquet")
     competing = pd.read_parquet(artifact_dir / "competing_risks_labels.parquet")
+    in_wild = pd.read_parquet(artifact_dir / "in_wild_labels.parquet")
     assert set(per_signal["cve_id"]) == {"CVE-2024-0001", "CVE-2024-0002"}
     assert "cause_code" in competing.columns
+    assert set(in_wild["event_source"]) <= {"kev", "google_0day", "censored"}
     assert manifest["per_signal_rows"] == 2
     assert manifest["competing_risks_rows"] == 2
+    assert manifest["in_wild_observed"] == 1
     assert manifest["attack_features_enabled"] is False
     assert manifest["epss_features_enabled"] is False
 
