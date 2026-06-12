@@ -91,7 +91,7 @@ Per scope guidance (2026-06-12): stay within the README's defined sources. New e
 - Calibration plots (Brier / reliability) at 7/30/90/180 days.
 - Description-text leakage mitigation (mask KEV/"actively exploited" terms; restrict text features to `last_modified ≤ published + ε`) before any NLP feature.
 - Deep survival models (DeepHit/DeepSurv via pycox) vs Cox, once competing-risks labels exist.
-- CI workflow running the test suite; pre-commit hooks.
+- ✅ CI workflow (`.github/workflows/ci.yml`: ruff + pytest on push/PR, py3.12) and pre-commit hooks (`.pre-commit-config.yaml`: hygiene hooks + ruff). Ruff lint is pyflakes-only (`F`) — real defects, no reformatting churn.
 - ✅ Pytest workaround baked into `pyproject` `addopts` (`--basetemp=.pytmp -p no:cacheprovider`) + `filterwarnings=["error::FutureWarning"]`, so plain `pytest` runs with the gate on.
 
 ## Conventions

@@ -81,6 +81,7 @@ def test_merge_live_merges_known_sources_and_copies_passthrough(tmp_path):
     assert set(pd.read_parquet(out / "poc_dates.parquet")["cve_id"]) == {"CVE-9"}
 
     manifest = json.loads((out / "merge_manifest.json").read_text())
+    assert summary["entries"] == manifest["entries"]  # return value mirrors the written manifest
     kev_entry = next(e for e in manifest["entries"] if e["source"] == "kev_events")
     assert kev_entry["merged_rows"] == 2
     assert kev_entry["live_rows"] == 2

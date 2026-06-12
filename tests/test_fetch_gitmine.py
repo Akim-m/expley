@@ -1,6 +1,5 @@
-import pandas as pd
 
-from temporal_exploit.fetch import gitmine, nuclei, poc
+from temporal_exploit.fetch import gitmine
 from temporal_exploit.fetch.nuclei import NucleiConnector
 from temporal_exploit.fetch.poc import PocConnector
 

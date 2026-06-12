@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from temporal_exploit.modeling import (
     cox_ph_assumptions,

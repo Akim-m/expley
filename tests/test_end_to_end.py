@@ -1,4 +1,3 @@
-import pandas as pd
 
 from temporal_exploit.features import build_publication_features
 from temporal_exploit.labels import build_first_weaponization_labels
