@@ -78,6 +78,28 @@ def test_early_stopping_uses_validation_tail():
     assert ((surv >= 0) & (surv <= 1)).all()
 
 
+def test_risk_scores_stay_finite_when_aft_prediction_under_or_overflows():
+    # On heavily censored frames AFT predicted times exp(mu) can hit 0 or inf;
+    # log() must not produce infinite risk scores (sksurv rejects them).
+    import xgboost  # noqa: F401  (DMatrix used inside _mu)
+
+    from temporal_exploit.xgb import XgbAftModel
+
+    class ExtremeBooster:
+        best_iteration = None
+
+        def predict(self, dmatrix, iteration_range=None):
+            return np.array([0.0, np.inf, 100.0])
+
+    model = XgbAftModel(ExtremeBooster(), ["a"], sigma=1.0, distribution="normal")
+    X = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    risk = model.risk_scores(X)
+    assert np.isfinite(risk).all()
+    surv = model.survival_at(X, [30])
+    assert np.isfinite(surv).all()
+    assert ((surv >= 0) & (surv <= 1)).all()
+
+
 def test_evaluate_survival_xgb():
     frame = _synthetic()
     train, test = time_split_frame(frame, "2023-09-01")

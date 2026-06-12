@@ -72,6 +72,30 @@ def test_build_dataset_enriches_with_attack(tmp_path):
     assert manifest["attack_features_enabled"] is True
 
 
+def test_build_dataset_writes_landmark_features(tmp_path):
+    out_dir = tmp_path / "out"
+    artifact_dir = tmp_path / "artifacts"
+    write_tiny_handover(out_dir)
+
+    build_dataset_command(
+        out_dir, artifact_dir, snapshot_date="2024-03-01", landmarks=(30,)
+    )
+
+    lm = pd.read_parquet(artifact_dir / "landmark_features_30d.parquet")
+    lm = lm.set_index("cve_id")
+    # tiny fixture: PoC for CVE-2024-0001 lands 9 days after publication
+    assert lm.loc["CVE-2024-0001", "poc_by_landmark"] == 1
+    assert lm.loc["CVE-2024-0001", "poc_lag_days"] == 9.0
+    assert lm.loc["CVE-2024-0002", "poc_by_landmark"] == 0
+    # kev/google_0day are the in-wild label sources, never landmark covariates
+    assert not any(c.startswith(("kev_", "google_0day_")) for c in lm.columns)
+
+    provenance = pd.read_csv(artifact_dir / "feature_provenance.csv")
+    assert (provenance["leakage_status"] == "landmark_safe").any()
+    manifest = json.loads((artifact_dir / "manifest.json").read_text())
+    assert manifest["landmarks"] == [30]
+
+
 def test_build_dataset_enriches_with_epss(tmp_path):
     out_dir = tmp_path / "out"
     artifact_dir = tmp_path / "artifacts"

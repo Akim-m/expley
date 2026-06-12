@@ -49,6 +49,7 @@ sync when work lands.
 - [x] **Tooling** — CI (ruff + pytest), pre-commit hooks, baked pytest config
 - [x] **WSL2 Ubuntu environment** — migrated off OneDrive/Windows (2026-06-12); env managed with uv; EPSS build 2.3× faster; GPU (`cuda:0`) verified
 - [x] **Full-feature baseline** — artifacts rebuilt with EPSS-at-publication + CWE + CVSS-vector features (72 cols); xgb early-stopping regression fixed (now opt-in). First-weaponization c-index: **xgb 0.607**, cox 0.588 (cutoff 2024-01-01)
+- [x] **Landmark features** (`--landmarks` / `train --landmark`) — tooling presence + EPSS as-of `published+L`, clock restarted at L. In-wild L=30 same-risk-set ablation: **cox 0.819→0.874** (~190 test events; CIs pending, see `docs/audit_2026-06-12.md`)
 
 This realizes steps 2–8 of the plan below; step 1 (handover) is the source material.
 
@@ -56,7 +57,7 @@ This realizes steps 2–8 of the plan below; step 1 (handover) is the source mat
 
 Open threads — the detailed backlog lives in [`docs/progress.md`](docs/progress.md):
 
-- **Landmarked artifact features** — the literature's biggest expected gain (see `docs/research_improvements_2026-06.md` P2): reference/write-up counts as-of `published + {1,7,30}d`, clock restarted at the landmark.
+- **Statistical-validity wave** — prioritized fixes from `docs/audit_2026-06-12.md`: same-day (duration-0) events silently dropped (26% of in-wild events), post-snapshot events unclipped, bootstrap CIs for c-index, IPCW degeneracy under administrative censoring, event-rate-scaled Cox penalizer, calibration min-events guard, KEV backfill clock correction.
 - **In-wild label broadening** — Exploit-DB / VulnCheck-KEV connectors exist but their labels aren't merged into `in_wild_labels` (1,543 events vs 336k censored is the binding constraint); honeypot feeds unwired.
 - **CIF-based headline evaluation** — `train-competing` computes unbiased Aalen-Johansen CIFs, but the default report still uses independent-KM per-signal probabilities (inflated).
 
