@@ -73,7 +73,7 @@ PoC is 97% of events, so a single first-weaponization model mostly learns PoC/di
 - **C2. ✅ Done.** CISA KEV live (`fetch/kev.py`). Verified live (1,618 rows to yesterday).
 - **C3. ✅ Done.** FIRST.org EPSS daily CSV.gz (`fetch/epss.py`) → epss_history schema for a given day.
 - **C4. ✅ Done.** NVD 2.0 API (`fetch/nvd.py`) → full cve_corpus schema, paged, apiKey header, hardened termination.
-- **C5. ◐ Partial.** Git-mined sources via path-based first-add mining. Shared `fetch/gitmine.py` primitives (`shallow_clone` with `--no-checkout --filter=blob:none`, `first_add_dates` history walk, `earliest_by_cve`) re-implemented in-package (not importing the immutable `enrich/` tree). **Nuclei** (`fetch/nuclei.py`) and **PoC** Trickest+Nomi-sec (`fetch/poc.py`) connectors + `fetch --source {nuclei,poc} --repo <cache>`. Verified end-to-end against the live Nuclei repo: 13.7s, 4,192 CVE→date rows current to today. *Metasploit (blob `-G` pickaxe, ~1hr) and Project Zero remain — heavier; deferred.*
+- **C5. ◐ Partial.** Git-mined sources, re-implemented in-package (not importing the immutable `enrich/` tree). Shared `fetch/gitmine.py` primitives: `shallow_clone` (`--no-checkout`, optional `with_blobs`), `first_add_dates` walk, `earliest_by_cve`, `file_at_head`, `earliest_introduction` (`-G` pickaxe). Connectors: **Nuclei** + **PoC** (Trickest+Nomi-sec) via path-based first-add; **Metasploit** (`fetch/metasploit.py`) via manifest + `git log -G` introduction date. All wired into `fetch --source {nuclei,poc,metasploit} --repo <cache>`. Live-verified: KEV/EPSS/NVD/Nuclei/PoC all fetch current-to-today (Nuclei 4,192 CVEs/13.7s; Trickest 159,902/19.3s; Nomi-sec 27,847/8.7s). Metasploit connector is mock-tested; its full live mine (blob clone + ~1hr `-G` across ~3,500 pairs) is opt-in and not run inline. *Project Zero remains.*
 - **C6. ✅ Done.** `merge.py` + `merge` CLI: `merge_live(handover_dir, live_dir, out_dir)` reconciles live deltas onto the handover parquets into a unified dir the build can consume — KEV full-snapshot (earliest `kev_date_added`), NVD corpus by newest `last_modified`, EPSS day-append by `(cve_id, date)`. Unmerged sources file-copy through (the 375M-row EPSS handover is never loaded unless it is the source being merged). Records per-source row deltas in `merge_manifest.json`.
 
 ### E. Modeling & training
@@ -84,9 +84,9 @@ PoC is 97% of events, so a single first-weaponization model mostly learns PoC/di
 Per scope guidance (2026-06-12): stay within the README's defined sources. New external feeds (OSV, GHSA, ExploitDB, VulnCheck API) are **out of the project's main scope** and parked unless explicitly requested. The "more public data" need is met by live-refreshing the README's own sources (workstream C).
 
 ## Scope for improvement (backlog / quality)
-- Artifact content hashes in `manifest.json` for reproducibility.
+- ✅ Artifact content hashes (`artifact_sha256`, SHA-256 per parquet/csv) in `manifest.json` for reproducibility.
+- ✅ Cox proportional-hazards diagnostics — `modeling.cox_ph_assumptions` (per-covariate `proportional_hazard_test`, `violates` flag); folded into `train` `metrics.json` as `cox_ph_assumptions`.
 - Event-source dominance warning emitted at build time when one source >X% of events.
-- Cox proportional-hazards diagnostics (`check_assumptions`) wired into a report before coefficient interpretation.
 - Calibration plots (Brier / reliability) at 7/30/90/180 days.
 - Description-text leakage mitigation (mask KEV/"actively exploited" terms; restrict text features to `last_modified ≤ published + ε`) before any NLP feature.
 - Deep survival models (DeepHit/DeepSurv via pycox) vs Cox, once competing-risks labels exist.

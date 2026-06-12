@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from temporal_exploit.modeling import (
+    cox_ph_assumptions,
     evaluate_survival,
     feature_matrix,
     fit_cox,
@@ -148,3 +149,19 @@ def test_evaluate_survival_skips_out_of_support_horizon():
     res = evaluate_survival(model, train, test, horizons=(7, 30, 100000), kind="cox")
     assert 100000 in res["skipped_horizons"]
     assert 100000 not in res["brier"]
+
+
+def test_cox_ph_assumptions_shape_and_sorting():
+    labels, features = _synthetic(n=120)
+    frame = prepare_modeling_frame(labels, features)
+    train, _ = time_split_frame(frame, "2023-09-01")
+    model = fit_cox(train)
+
+    diag = cox_ph_assumptions(model, train)
+
+    assert list(diag.columns) == ["covariate", "test_statistic", "p", "violates"]
+    assert len(diag) == len(model.feature_cols_)
+    assert set(diag["covariate"]) == set(model.feature_cols_)
+    assert ((diag["p"] >= 0.0) & (diag["p"] <= 1.0)).all()
+    assert diag["violates"].dtype == bool
+    assert diag["p"].is_monotonic_increasing

@@ -36,6 +36,8 @@ def test_build_dataset_writes_artifacts(tmp_path):
     assert manifest["in_wild_observed"] == 1
     assert manifest["attack_features_enabled"] is False
     assert manifest["epss_features_enabled"] is False
+    assert "modeling_labels.parquet" in manifest["artifact_sha256"]
+    assert "feature_provenance.csv" in manifest["artifact_sha256"]
 
 
 def test_build_dataset_enriches_with_attack(tmp_path):
@@ -204,6 +206,31 @@ def test_main_fetch_nuclei(tmp_path, monkeypatch):
 def test_main_fetch_poc_requires_repo(tmp_path):
     with pytest.raises(ValueError, match="--repo"):
         main(["fetch", "--source", "poc", "--live-dir", str(tmp_path)])
+
+
+def test_main_fetch_metasploit(tmp_path, monkeypatch):
+    import json as _json
+
+    from temporal_exploit.fetch import gitmine
+
+    monkeypatch.setattr(gitmine, "shallow_clone", lambda url, dest, with_blobs=False: None)
+    monkeypatch.setattr(
+        gitmine,
+        "file_at_head",
+        lambda repo, path: _json.dumps(
+            {"m": {"path": "modules/exploits/x.rb", "references": ["CVE-2021-44228"]}}
+        ),
+    )
+    monkeypatch.setattr(gitmine, "earliest_introduction", lambda repo, cve, path: (1_600_000_000, "abc123"))
+    main(
+        [
+            "fetch", "--source", "metasploit",
+            "--live-dir", str(tmp_path / "live"),
+            "--repo", str(tmp_path / "cache"),
+        ]
+    )
+    saved = pd.read_parquet(tmp_path / "live" / "metasploit_dates.parquet")
+    assert set(saved["cve_id"]) == {"CVE-2021-44228"}
 
 
 def test_main_merge_smoke(tmp_path):
