@@ -40,7 +40,7 @@ sync when work lands.
 - [x] **Dataset builder** — first-weaponization, per-signal, competing-risks, and in-wild labels; right-censoring at a snapshot; negative-duration flagging
 - [x] **Leakage-safe features** — CVSS/CWE/CPE counts, ATT&CK-chain, EPSS-at-publication; snapshot presence kept separate; provenance audit trail; manifest with artifact content hashes
 - [x] **Time-based locked train/test splits**
-- [x] **Models** — Kaplan-Meier, Cox PH (+ proportional-hazards assumption diagnostics), Random Survival Forest, optional GPU DeepSurv (pycox)
+- [x] **Models** — Kaplan-Meier, Cox PH (+ proportional-hazards assumption diagnostics), Random Survival Forest, GPU XGBoost AFT (`--models`), optional GPU DeepSurv (`--deep`)
 - [x] **Evaluation** — IPCW concordance, (integrated) Brier, calibration/reliability plots at 7/30/90/180d, event-rate-by-horizon, cascade order, EPSS reconciliation, build-time source-dominance warning
 - [x] **Live fetch connectors** (refresh each source to today) — CISA KEV, EPSS, NVD 2.0, Nuclei, PoC (Trickest + Nomi-sec), Metasploit, Project Zero 0-day
 - [x] **Merge layer** — reconcile live deltas onto the handover parquets into a unified dataset the builder consumes
@@ -54,7 +54,7 @@ This realizes steps 2–8 of the plan below; step 1 (handover) is the source mat
 Open threads — the detailed backlog lives in [`docs/progress.md`](docs/progress.md):
 
 - **Metasploit live mine** — connector is built and mock-tested, but the full end-to-end blob clone + `git log -G` (~1 hr over ~3,500 module/CVE pairs) has not been run; the lighter sources are live-verified.
-- **DeepSurv depth** — wire `deep.fit_deepsurv` into the `train` CLI; add a DeepHit competing-risks variant; tune architecture/epochs. Optional `[deep]` extra; CUDA is auto-selected.
+- **Deep-model depth** — `--deep` wires DeepSurv into `train`; still open: a DeepHit competing-risks variant and architecture/epoch tuning. Optional `[deep]` extra; CUDA is auto-selected.
 - **NLP features** — `text_safety.py` is ready (leakage masking + freshness gating) but no description-text feature consumes it yet.
 - **Scheduled incremental refresh** — `merge` reconciles deltas, but there is no automated NVD `lastMod`-window pull to keep a live dataset current on a schedule.
 - **Project Zero dates** — the live sheet leaves "Date Discovered" blank for the most recent rows (source-side); consider a disclosure-date fallback.
@@ -217,6 +217,32 @@ pytest
 Generated artifacts land in `artifacts/` (ignored by Git): `modeling_labels.parquet`,
 `publication_features.parquet`, and `manifest.json`. Methodology is documented in
 `docs/modeling_methodology.md`.
+
+## Memory: check RAM/VRAM limits before any model work
+
+**Always check free RAM (and VRAM if using `xgb`/`--deep`) before building or
+training** — the full dataset is 338k CVEs and the heavier paths page a 16 GB
+laptop into the ground if something else is hogging memory:
+
+```powershell
+Get-CimInstance Win32_OperatingSystem | Select @{n='FreeRAM_GB';e={[math]::Round($_.FreePhysicalMemory/1MB,2)}}
+nvidia-smi --query-gpu=memory.used,memory.total --format=csv
+```
+
+Rules of thumb on the full dataset:
+
+- `train --models cox,xgb` — the laptop-friendly default to prefer; XGBoost AFT
+  trains on the GPU when present and its survival curves are closed-form, so
+  evaluation memory stays flat.
+- `train --models cox,rsf` — the RSF is the RAM hog: the fitted forest holds
+  per-leaf survival curves (~5 GB resident) plus batched prediction buffers.
+  Budget ~10 GB free RAM and close other heavy apps first.
+- `build-dataset --epss-path ...` — the 375M-row EPSS history is streamed in
+  capped batches (~2 GB); don't run it concurrently with training.
+- `train --deep` — DeepSurv evaluation is sampled (20k rows) to bound the
+  survival-matrix size; training itself runs on the GPU.
+- Run one heavy job at a time. Two of the above concurrently is what causes
+  the swap-death.
 
 ## Main documentation
 
