@@ -5,6 +5,7 @@ from temporal_exploit.evaluate import (
     epss_reconciliation,
     event_rate_by_horizon,
     event_source_counts,
+    event_source_dominance,
 )
 
 
@@ -17,6 +18,26 @@ def _labels():
             "event_source": ["poc", "kev", "censored", "censored"],
         }
     )
+
+
+def test_event_source_dominance_flags_majority():
+    labels = pd.DataFrame(
+        {
+            "event_observed": [True, True, True, False],
+            "event_source": ["poc", "poc", "kev", "censored"],
+        }
+    )
+    d = event_source_dominance(labels, threshold=0.5)
+    assert d["dominant_source"] == "poc"
+    assert d["dominant_share"] == round(2 / 3, 4)
+    assert d["exceeds_threshold"] is True
+
+
+def test_event_source_dominance_empty():
+    labels = pd.DataFrame({"event_observed": [False], "event_source": ["censored"]})
+    d = event_source_dominance(labels)
+    assert d["dominant_source"] is None
+    assert d["exceeds_threshold"] is False
 
 
 def test_event_rate_by_horizon():

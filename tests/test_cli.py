@@ -38,6 +38,7 @@ def test_build_dataset_writes_artifacts(tmp_path):
     assert manifest["epss_features_enabled"] is False
     assert "modeling_labels.parquet" in manifest["artifact_sha256"]
     assert "feature_provenance.csv" in manifest["artifact_sha256"]
+    assert manifest["event_source_dominance"]["dominant_source"] == "poc"  # only observed event
 
 
 def test_build_dataset_enriches_with_attack(tmp_path):
