@@ -231,6 +231,17 @@ def test_evaluate_survival_skips_out_of_support_horizon():
     assert 100000 not in res["brier"]
 
 
+def test_cox_ph_assumptions_sampling_caps_rows():
+    labels, features = _synthetic(n=120)
+    frame = prepare_modeling_frame(labels, features)
+    train, _ = time_split_frame(frame, "2023-09-01")
+    model = fit_cox(train)
+
+    diag = cox_ph_assumptions(model, train, max_rows=30)
+    assert list(diag.columns) == ["covariate", "test_statistic", "p", "violates"]
+    assert len(diag) == len(model.feature_cols_)
+
+
 def test_cox_ph_assumptions_shape_and_sorting():
     labels, features = _synthetic(n=120)
     frame = prepare_modeling_frame(labels, features)

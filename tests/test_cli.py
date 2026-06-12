@@ -40,6 +40,13 @@ def test_build_dataset_writes_artifacts(tmp_path):
     assert "feature_provenance.csv" in manifest["artifact_sha256"]
     assert manifest["event_source_dominance"]["dominant_source"] == "poc"  # only observed event
 
+    # transition-safe PoC features written separately (never merged into the
+    # publication-time-safe feature set)
+    poc_feats = pd.read_parquet(artifact_dir / "poc_transition_features.parquet")
+    assert "poc_count" in poc_feats.columns
+    assert len(poc_feats) == 2
+    assert "poc_count" not in features.columns
+
 
 def test_build_dataset_enriches_with_attack(tmp_path):
     out_dir = tmp_path / "out"
@@ -314,6 +321,91 @@ def _synthetic_artifacts(artifact_dir):
             "negative_duration_flag": False,
         }
     ).to_parquet(artifact_dir / "in_wild_labels.parquet", index=False)
+
+
+def _competing_artifacts(artifact_dir):
+    import numpy as np
+
+    rng = np.random.default_rng(1)
+    n = 200
+    cvss = rng.uniform(2.0, 10.0, n)
+    poc_time = np.clip(150.0 - 12.0 * cvss + rng.normal(0, 15, n), 1.0, None)
+    kev_time = rng.uniform(20.0, 400.0, n)
+    censor = rng.uniform(50.0, 300.0, n)
+    published = pd.to_datetime("2023-01-01", utc=True) + pd.to_timedelta(
+        rng.integers(0, 700, n), unit="D"
+    )
+    cve_id = [f"CVE-2023-{i:05d}" for i in range(n)]
+
+    first = np.minimum.reduce([poc_time, kev_time, censor])
+    cause = np.select(
+        [first == poc_time, first == kev_time], [1, 2], default=0
+    )
+    cause[first == censor] = 0
+    pd.DataFrame(
+        {
+            "cve_id": cve_id,
+            "published": published,
+            "duration_days": first,
+            "event_cause": np.select([cause == 1, cause == 2], ["poc", "kev"], "censored"),
+            "cause_code": cause,
+            "event_observed": cause > 0,
+        }
+    ).to_parquet(artifact_dir / "competing_risks_labels.parquet", index=False)
+
+    poc_obs = cause == 1
+    msf_obs = poc_obs & (rng.random(n) < 0.4)
+    poc_date = published + pd.to_timedelta(poc_time, unit="D")
+    msf_date = poc_date + pd.to_timedelta(rng.uniform(5.0, 60.0, n), unit="D")
+    pd.DataFrame(
+        {
+            "cve_id": cve_id,
+            "published": published,
+            "poc_event_date": poc_date.where(pd.Series(poc_obs)),
+            "poc_observed": poc_obs,
+            "metasploit_event_date": msf_date.where(pd.Series(msf_obs)),
+            "metasploit_observed": msf_obs,
+        }
+    ).to_parquet(artifact_dir / "per_signal_labels.parquet", index=False)
+
+    pd.DataFrame(
+        {
+            "cve_id": cve_id,
+            "poc_count": rng.integers(0, 5, n),
+            "poc_source_count": rng.integers(0, 3, n),
+            "poc_missing": (~poc_obs).astype(int),
+            "poc_first_lag_days": np.where(poc_obs, poc_time, -1.0),
+        }
+    ).to_parquet(artifact_dir / "poc_transition_features.parquet", index=False)
+
+
+def test_train_competing_command_writes_metrics(tmp_path):
+    from temporal_exploit.cli import train_competing_command
+
+    artifact_dir = tmp_path / "artifacts"
+    report_dir = tmp_path / "report"
+    _synthetic_artifacts(artifact_dir)
+    _competing_artifacts(artifact_dir)
+
+    metrics = train_competing_command(
+        artifact_dir,
+        "2023-09-01",
+        report_dir,
+        horizons=(30, 90),
+        transitions=(("poc", "metasploit"),),
+        snapshot_date="2025-01-01",
+    )
+
+    written = json.loads((report_dir / "competing_metrics.json").read_text())
+    assert written == metrics
+    aj = metrics["aj_cif_train"]
+    assert all(0.0 <= row["cif"] <= 1.0 for row in aj)
+    assert {row["cause_code"] for row in aj} == {1, 2}
+    assert "1" in metrics["cause_specific_cox"]
+    assert metrics["cause_specific_cox"]["1"]["n_events"] > 0
+    trans = metrics["transitions"]["poc->metasploit"]
+    assert trans["n"] > 0
+    assert 0.0 <= trans["c_index"] <= 1.0
 
 
 def test_train_command_writes_metrics(tmp_path):

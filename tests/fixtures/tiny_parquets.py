@@ -19,7 +19,9 @@ def write_tiny_handover(out_dir: Path) -> None:
     pd.DataFrame(
         {
             "cve_id": ["CVE-2024-0001"],
+            "poc_source": ["trickest"],
             "poc_first_seen": pd.to_datetime(["2024-01-10"], utc=True),
+            "poc_path": ["2024/CVE-2024-0001.md"],
         }
     ).to_parquet(out_dir / "poc_dates.parquet")
     pd.DataFrame(
