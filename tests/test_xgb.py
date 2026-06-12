@@ -57,6 +57,17 @@ def test_fit_xgb_aft_and_survival_curve_properties():
     assert (np.diff(surv, axis=1) <= 1e-12).all()  # S(t) non-increasing in t
 
 
+def test_default_fit_does_not_early_stop():
+    # Early stopping must be opt-in: the time-tail validation split is mostly
+    # censored (shortest follow-up before the cutoff), so aft-nloglik on it
+    # rewards underfitting — on the real corpus it stopped at iter 57/500 and
+    # cost 7 c-index points (0.607 -> 0.537).
+    frame = _synthetic(n=400)
+    model = fit_xgb_aft(frame, num_rounds=60)
+    assert getattr(model.booster, "best_iteration", None) is None
+    assert model.booster.num_boosted_rounds() == 60
+
+
 def test_early_stopping_uses_validation_tail():
     frame = _synthetic(n=400)
     model = fit_xgb_aft(frame, num_rounds=300, early_stopping_rounds=20)
