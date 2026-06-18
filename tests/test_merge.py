@@ -54,6 +54,49 @@ def test_merge_source_empty_live_returns_handover():
     assert len(merged) == 1
 
 
+def test_merge_dedups_vulncheck_and_exploitdb(tmp_path):
+    # vulncheck_kev / exploitdb have no handover counterpart (live-only), but a
+    # re-fetch must still dedup within the live frame on the merge key rather
+    # than pass through verbatim with duplicate rows.
+    handover = tmp_path / "h"
+    live = tmp_path / "l"
+    out = tmp_path / "o"
+    handover.mkdir()
+    live.mkdir()
+    _kev(["CVE-1"], ["2022-01-01"]).to_parquet(handover / "kev_events.parquet", index=False)
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-1", "CVE-1"],
+            "vulncheck_kev_date_added": pd.to_datetime(["2022-03-01", "2022-01-15"], utc=True),
+        }
+    ).to_parquet(live / "vulncheck_kev.parquet", index=False)
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-1", "CVE-1", "CVE-1"],
+            "exploitdb_id": [10, 10, 20],
+            "exploitdb_date_published": pd.to_datetime(
+                ["2022-03-01", "2022-01-15", "2022-02-01"], utc=True
+            ),
+        }
+    ).to_parquet(live / "exploitdb.parquet", index=False)
+
+    summary = merge_live(handover, live, out)
+
+    vc = pd.read_parquet(out / "vulncheck_kev.parquet")
+    assert len(vc) == 1  # one CVE, earliest date_added wins
+    assert vc.loc[0, "vulncheck_kev_date_added"] == pd.Timestamp("2022-01-15", tz="UTC")
+
+    edb = pd.read_parquet(out / "exploitdb.parquet")
+    assert len(edb) == 2  # (CVE-1,10) deduped to earliest, (CVE-1,20) kept
+    id10 = edb[edb["exploitdb_id"] == 10].iloc[0]
+    assert id10["exploitdb_date_published"] == pd.Timestamp("2022-01-15", tz="UTC")
+
+    # manifest records the dedup as a merge, not a verbatim copy
+    strategies = {e["source"]: e["strategy"] for e in summary["entries"]}
+    assert strategies["vulncheck_kev"] == "merge_live_only"
+    assert strategies["exploitdb"] == "merge_live_only"
+
+
 def test_merge_live_merges_known_sources_and_copies_passthrough(tmp_path):
     handover = tmp_path / "handover"
     live = tmp_path / "live"
