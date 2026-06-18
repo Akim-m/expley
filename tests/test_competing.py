@@ -182,3 +182,36 @@ def test_cif_calibration_table_constant_pred_returns_empty():
     table = cif_calibration_table(np.full(len(frame), 0.5), frame, cause_code=1, horizon=90)
     assert list(table.columns) == CAL_COLS
     assert table.empty
+
+
+def _competing_split(n=800, seed=1):
+    from temporal_exploit.competing import prepare_competing_frame
+
+    labels, features = _synthetic(n=n, seed=seed)
+    frame = prepare_competing_frame(labels, features)
+    cutoff = pd.Timestamp("2023-12-01", tz="UTC")
+    train = frame[frame["published"] < cutoff].reset_index(drop=True)
+    test = frame[frame["published"] >= cutoff].reset_index(drop=True)
+    return frame, train, test
+
+
+def test_cause_specific_cindex_on_test_and_none_when_absent():
+    from temporal_exploit.competing import cause_specific_cindex
+
+    _, train, test = _competing_split()
+    c = cause_specific_cindex(train, test, 1)  # cause 1 driven by cvss -> rankable
+    assert c is not None and 0.0 <= c <= 1.0
+    # a cause with no events anywhere -> undefined -> None (no crash)
+    assert cause_specific_cindex(train, test, 99) is None
+
+
+def test_cif_vs_independent_inflation_nonnegative():
+    from temporal_exploit.competing import cif_vs_independent
+
+    frame, _, _ = _competing_split()
+    tbl = cif_vs_independent(frame, [30, 90, 180])
+    assert set(tbl.columns) >= {"cause_code", "horizon", "aj_cif", "independent_km", "inflation"}
+    # naive 1-KM (competing events censored) overestimates the AJ CIF
+    assert (tbl["inflation"] >= -1e-9).all()
+    assert (tbl["independent_km"] >= tbl["aj_cif"] - 1e-9).all()
+    assert (tbl["aj_cif"] >= 0).all() and (tbl["aj_cif"] <= 1).all()

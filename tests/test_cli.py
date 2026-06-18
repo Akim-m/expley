@@ -428,6 +428,14 @@ def test_train_competing_command_writes_metrics(tmp_path):
     assert {row["cause_code"] for row in aj} == {1, 2}
     assert "1" in metrics["cause_specific_cox"]
     assert metrics["cause_specific_cox"]["1"]["n_events"] > 0
+    # per-cause held-out discrimination (None when test lacks that cause's events)
+    tci = metrics["cause_specific_cox"]["1"]["test_c_index"]
+    assert tci is None or 0.0 <= tci <= 1.0
+    # headline: unbiased AJ CIF vs inflated independent-KM, inflation >= 0
+    headline = metrics["headline_cif"]
+    assert {row["cause_code"] for row in headline} == {1, 2}
+    assert all(row["inflation"] >= -1e-9 for row in headline)
+    assert all(row["independent_km"] >= row["aj_cif"] - 1e-9 for row in headline)
     trans = metrics["transitions"]["poc->metasploit"]
     assert trans["n"] > 0
     assert 0.0 <= trans["c_index"] <= 1.0
