@@ -54,6 +54,40 @@ def test_merge_source_empty_live_returns_handover():
     assert len(merged) == 1
 
 
+def test_merge_refreshes_gitmined_sources(tmp_path):
+    # git-mined sources (poc/nuclei/metasploit) are full-history snapshots; a
+    # refresh must flow through (union, earliest first-seen per key), not be
+    # shadowed by the stale handover copy.
+    handover = tmp_path / "h"
+    live = tmp_path / "l"
+    out = tmp_path / "o"
+    handover.mkdir()
+    live.mkdir()
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-1"],
+            "poc_source": ["trickest"],
+            "poc_first_seen": pd.to_datetime(["2024-05-01"], utc=True),
+            "poc_path": ["a"],
+        }
+    ).to_parquet(handover / "poc_dates.parquet", index=False)
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-1", "CVE-2"],
+            "poc_source": ["trickest", "nomisec"],
+            "poc_first_seen": pd.to_datetime(["2024-01-01", "2024-06-01"], utc=True),
+            "poc_path": ["a", "b"],
+        }
+    ).to_parquet(live / "poc_dates.parquet", index=False)
+
+    merge_live(handover, live, out)
+
+    poc = pd.read_parquet(out / "poc_dates.parquet").set_index("cve_id")
+    assert set(poc.index) == {"CVE-1", "CVE-2"}  # live CVE-2 flows through
+    # earliest of handover(2024-05) and live(2024-01) for CVE-1
+    assert poc.loc["CVE-1", "poc_first_seen"] == pd.Timestamp("2024-01-01", tz="UTC")
+
+
 def test_merge_dedups_vulncheck_and_exploitdb(tmp_path):
     # vulncheck_kev / exploitdb have no handover counterpart (live-only), but a
     # re-fetch must still dedup within the live frame on the merge key rather
