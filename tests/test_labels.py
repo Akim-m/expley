@@ -13,6 +13,43 @@ from temporal_exploit.labels import (
 from tests.fixtures.tiny_parquets import write_tiny_handover
 
 
+def test_vulncheck_is_in_wild_exploitdb_is_not() -> None:
+    # VulnCheck KEV is a known-exploited catalog -> in-wild signal; Exploit-DB is
+    # public tooling/exploit availability -> first-weaponization, NOT in-wild.
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-A", "CVE-B"],
+            "published": pd.to_datetime(["2023-01-01", "2023-01-01"], utc=True),
+        }
+    )
+    frames = {
+        "vulncheck_kev": (
+            pd.DataFrame(
+                {
+                    "cve_id": ["CVE-A"],
+                    "vulncheck_kev_date_added": pd.to_datetime(["2023-02-01"], utc=True),
+                }
+            ),
+            "vulncheck_kev_date_added",
+        ),
+        "exploitdb": (
+            pd.DataFrame(
+                {
+                    "cve_id": ["CVE-B"],
+                    "exploitdb_date_published": pd.to_datetime(["2023-01-10"], utc=True),
+                }
+            ),
+            "exploitdb_date_published",
+        ),
+    }
+    iw = build_in_wild_labels(corpus, frames, "2026-03-14").set_index("cve_id")
+    assert bool(iw.loc["CVE-A", "event_observed"])       # vulncheck -> in-wild
+    assert not bool(iw.loc["CVE-B", "event_observed"])   # exploitdb -> not in-wild
+
+    fw = build_first_weaponization_labels(corpus, frames, "2026-03-14").set_index("cve_id")
+    assert fw.loc["CVE-B", "event_source"] == "exploitdb"  # exploitdb -> first-weap
+
+
 def test_first_event_per_cve_takes_earliest_valid_date() -> None:
     frame = pd.DataFrame(
         {
