@@ -54,6 +54,24 @@ def test_cure_risk_scores_rank_susceptibles_higher():
     assert np.all((risk >= 0) & (risk <= 1))
 
 
+def test_cure_analytic_gradient_matches_finite_difference():
+    from scipy.optimize import approx_fprime
+
+    from temporal_exploit.cure import _objective
+
+    rng = np.random.default_rng(3)
+    n, p = 200, 2
+    Xs = rng.normal(size=(n, p))
+    logt = np.log(rng.uniform(1.0, 300.0, n))
+    observed = rng.random(n) < 0.4
+    ridge = 0.7
+    theta = rng.normal(scale=0.3, size=2 * p + 3)
+
+    _, grad = _objective(theta, Xs, logt, observed, ridge)
+    fd = approx_fprime(theta, lambda th: _objective(th, Xs, logt, observed, ridge)[0], 1e-6)
+    assert np.allclose(grad, fd, rtol=1e-4, atol=1e-4)
+
+
 def test_cure_feature_cols_exclude_meta():
     from temporal_exploit.cure import fit_cure
 
