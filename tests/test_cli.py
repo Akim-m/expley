@@ -508,6 +508,26 @@ def test_train_command_in_wild_label_set(tmp_path):
     assert 0.0 <= metrics["cox"]["c_index_ipcw"] <= 1.0
 
 
+def test_train_command_cure_model_end_to_end(tmp_path):
+    from temporal_exploit.cli import train_command
+
+    artifact_dir = tmp_path / "artifacts"
+    report_dir = tmp_path / "report"
+    _synthetic_artifacts(artifact_dir)
+
+    metrics = train_command(
+        artifact_dir,
+        "2023-09-01",
+        report_dir,
+        horizons=(7, 30, 90),
+        label_set="in_wild",
+        models=("cure",),
+    )
+    assert "cure" in metrics
+    assert 0.0 <= metrics["cure"]["c_index_ipcw"] <= 1.0
+    assert (report_dir / "calibration_cure.png").exists()
+
+
 def test_in_wild_clock_start_picks_latest_active_catalog(monkeypatch):
     import temporal_exploit.cli as cli
 

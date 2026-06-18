@@ -364,3 +364,18 @@ def test_fit_cox_escalates_penalizer_until_convergence(monkeypatch):
     assert len(seen) == 2
     assert seen[1] == pytest.approx(seen[0] * 10)
     assert model.penalizer == pytest.approx(seen[1])
+
+
+def test_survival_at_and_risk_dispatch_cure():
+    from temporal_exploit.cure import fit_cure
+    from temporal_exploit.modeling import _risk_scores, survival_at
+    from tests.test_cure import _synth_cure
+
+    frame = _synth_cure()
+    model = fit_cure(frame)
+    X = frame[model.feature_cols_].astype(float).head(5)
+    surv = survival_at(model, X, [30, 90], "cure")
+    assert surv.shape == (5, 2)
+    assert np.all((surv > 0) & (surv <= 1))
+    risk = _risk_scores(model, X, "cure")
+    assert risk.shape == (5,)
