@@ -118,6 +118,39 @@ def test_fetch_pages_until_total_results(monkeypatch):
     assert all(api_key == "secret" for _, api_key in calls)
 
 
+def test_fetch_normalizes_bare_dates_to_iso_datetime(monkeypatch):
+    # NVD 2.0 rejects bare YYYY-MM-DD; the connector must widen them to the
+    # ISO-8601 extended format (start of day .. end of day).
+    import urllib.parse
+
+    captured = []
+
+    def fake_fetch_json(url, api_key=None):
+        captured.append(urllib.parse.unquote(url))
+        return {"totalResults": 1, "resultsPerPage": 1, "vulnerabilities": [_cve(id="CVE-A")]}
+
+    monkeypatch.setattr(nvd, "_fetch_json", fake_fetch_json)
+    NvdConnector().fetch("2024-01-01", "2024-02-01")
+
+    assert "lastModStartDate=2024-01-01T00:00:00.000" in captured[0]
+    assert "lastModEndDate=2024-02-01T23:59:59.999" in captured[0]
+
+
+def test_fetch_preserves_explicit_datetime(monkeypatch):
+    # an already-full datetime is passed through unchanged
+    import urllib.parse
+
+    captured = []
+    monkeypatch.setattr(
+        nvd, "_fetch_json",
+        lambda url, api_key=None: (captured.append(urllib.parse.unquote(url)) or
+                                   {"totalResults": 0, "resultsPerPage": 0, "vulnerabilities": []}),
+    )
+    NvdConnector().fetch("2024-01-01T06:30:00.000", "2024-02-01T12:00:00.000")
+    assert "lastModStartDate=2024-01-01T06:30:00.000" in captured[0]
+    assert "lastModEndDate=2024-02-01T12:00:00.000" in captured[0]
+
+
 def test_fetch_stops_on_short_page(monkeypatch):
     # totalResults overstates what the API returns; an empty page must end the loop
     pages = [
