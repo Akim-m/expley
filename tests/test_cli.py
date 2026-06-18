@@ -342,6 +342,7 @@ def _synthetic_artifacts(artifact_dir):
             "published": published,
             "duration_days": duration,
             "event_observed": in_wild_observed,
+            "event_source": np.where(in_wild_observed, "kev", "censored"),
             "negative_duration_flag": False,
         }
     ).to_parquet(artifact_dir / "in_wild_labels.parquet", index=False)
@@ -505,6 +506,19 @@ def test_train_command_in_wild_label_set(tmp_path):
 
     assert metrics["label_set"] == "in_wild"
     assert 0.0 <= metrics["cox"]["c_index_ipcw"] <= 1.0
+
+
+def test_in_wild_clock_start_picks_latest_active_catalog(monkeypatch):
+    import temporal_exploit.cli as cli
+
+    # only sources with a known catalog-launch artifact constrain the clock
+    assert cli.in_wild_clock_start(("kev", "google_0day", "censored")) == cli.CATALOG_START["kev"]
+    # no catalog source active (google_0day has genuine dates) -> no filter
+    assert cli.in_wild_clock_start(("google_0day", "censored")) is None
+    assert cli.in_wild_clock_start(()) is None
+    # with multiple catalog sources, take the latest (most conservative) start
+    monkeypatch.setitem(cli.CATALOG_START, "vulncheck_kev", "2024-02-01")
+    assert cli.in_wild_clock_start(("kev", "vulncheck_kev", "google_0day")) == "2024-02-01"
 
 
 def test_train_command_rejects_unknown_label_set(tmp_path):
