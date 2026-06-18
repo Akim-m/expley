@@ -47,6 +47,15 @@ def test_merge_source_epss_dedupes_by_cve_date_live_wins():
     assert day1.iloc[0]["epss"] == 0.2
 
 
+def test_merge_source_empty_handover_dedups_live():
+    # an empty-but-present handover must not let live duplicate keys pass through
+    handover = _kev([], [])
+    live = _kev(["CVE-1", "CVE-1"], ["2024-03-01", "2024-01-01"])
+    merged = merge_source(handover, live, key="cve_id", order_col="kev_date_added", keep="first")
+    assert len(merged) == 1
+    assert merged.iloc[0]["kev_date_added"] == pd.Timestamp("2024-01-01", tz="UTC")
+
+
 def test_merge_source_empty_live_returns_handover():
     handover = _kev(["CVE-1"], ["2024-02-01"])
     empty = handover.iloc[0:0]

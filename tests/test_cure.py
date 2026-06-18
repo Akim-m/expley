@@ -72,6 +72,35 @@ def test_cure_analytic_gradient_matches_finite_difference():
     assert np.allclose(grad, fd, rtol=1e-4, atol=1e-4)
 
 
+def test_cure_gradient_correct_in_clipped_region(monkeypatch):
+    # exercise the z >= _Z_MAX branch (where ez saturates): the gradient must be
+    # the exact gradient of the *clipped* NLL (ez-derivative zeroed), not use the
+    # saturated ez. Lower _Z_MAX so the clipped ez stays finite/FD-testable.
+    from scipy.optimize import approx_fprime
+
+    from temporal_exploit import cure as cure_mod
+
+    monkeypatch.setattr(cure_mod, "_Z_MAX", 5.0)
+    rng = np.random.default_rng(11)
+    n, p = 120, 2
+    Xs = rng.normal(scale=0.2, size=(n, p))
+    logt = rng.uniform(1.0, 2.0, n)
+    observed = rng.random(n) < 0.5
+    ridge = 0.5
+    theta = np.zeros(2 * p + 3)
+    theta[1 + p] = -2.0   # a0 -> log_scale ~ -2 -> u ~ 3-4
+    theta[-1] = 1.0       # log_k -> k ~ 2.72 -> k*u ~ 8-11 >> 5 (all clipped)
+    k = np.exp(theta[-1])
+    s = theta[1 + p] + Xs @ theta[2 + p : 2 + 2 * p]
+    assert (k * (logt - s) >= 5.0).all()  # the clipped branch is actually hit
+
+    _, grad = cure_mod._objective(theta, Xs, logt, observed, ridge)
+    fd = approx_fprime(
+        theta, lambda th: cure_mod._objective(th, Xs, logt, observed, ridge)[0], 1e-7
+    )
+    assert np.allclose(grad, fd, rtol=1e-3, atol=1e-3)
+
+
 def test_cure_feature_cols_exclude_meta():
     from temporal_exploit.cure import fit_cure
 
