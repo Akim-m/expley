@@ -14,6 +14,20 @@ def test_load_parquet_reads_named_file(tmp_path: Path) -> None:
     assert df["cve_id"].tolist() == ["CVE-2024-0001", "CVE-2024-0002"]
 
 
+def test_load_parquet_projects_columns(tmp_path: Path) -> None:
+    write_tiny_handover(tmp_path)
+
+    # only the requested columns are read into memory; list columns (cwe_ids)
+    # must survive projection (physical parquet schema names them 'element').
+    df = load_parquet(tmp_path, "cve_corpus", columns=["cve_id", "published", "cwe_ids"])
+    assert list(df.columns) == ["cve_id", "published", "cwe_ids"]
+
+    # a requested column absent from the file is silently skipped (no raise),
+    # so callers can request a superset of optional columns
+    df2 = load_parquet(tmp_path, "cve_corpus", columns=["cve_id", "nonexistent_col"])
+    assert list(df2.columns) == ["cve_id"]
+
+
 def test_load_parquet_raises_clear_error_for_missing_file(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="Missing parquet"):
         load_parquet(tmp_path, "cve_corpus")
