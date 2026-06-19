@@ -195,12 +195,19 @@ def test_build_epss_at_landmark_takes_last_reading_in_window(tmp_path):
     out = build_epss_at_landmark(corpus, str(path), landmark_days=7)
     out = out.set_index("cve_id")
 
-    # CVE-1: readings at day 0 and 4 are in [published, published+7]; last wins
-    assert out.loc["CVE-2024-0001", "epss_at_landmark"] == pytest.approx(0.4)
+    # CVE-1: readings at day 0 (0.1) and 4 (0.4) are in [published, published+7]
+    assert out.loc["CVE-2024-0001", "epss_at_landmark"] == pytest.approx(0.4)  # last
     assert out.loc["CVE-2024-0001", "epss_at_landmark_missing"] == 0
-    # CVE-2: only reading is day 19 — outside the window
+    # dynamics: first=0.1, last=0.4 -> velocity +0.3, rising, peak 0.4 (the 0.9 at
+    # day 19 is outside the 7-day window)
+    assert out.loc["CVE-2024-0001", "epss_velocity_to_landmark"] == pytest.approx(0.3)
+    assert out.loc["CVE-2024-0001", "epss_rising_to_landmark"] == 1
+    assert out.loc["CVE-2024-0001", "epss_max_to_landmark"] == pytest.approx(0.4)
+    # CVE-2: only reading is day 19 — outside the window -> all dynamics zero
     assert out.loc["CVE-2024-0002", "epss_at_landmark_missing"] == 1
     assert out.loc["CVE-2024-0002", "epss_at_landmark"] == 0.0
+    assert out.loc["CVE-2024-0002", "epss_velocity_to_landmark"] == 0.0
+    assert out.loc["CVE-2024-0002", "epss_rising_to_landmark"] == 0
 
 
 def test_provenance_rows_cover_every_feature_family():
