@@ -1,3 +1,5 @@
+import pytest
+
 from temporal_exploit.backtest import make_origins, rolling_origin_backtest
 from temporal_exploit.features import build_publication_features
 from temporal_exploit.simulate import synth_weaponization
@@ -31,6 +33,28 @@ def test_backtest_recovers_signal_across_origins():
     assert agg["horizon_auc"]["90"]["sd"] >= 0.0
     # operational: flagging the top decile catches more than its share of weaponizers
     assert agg["recall_at_top"]["90"]["mean"] > 0.10
+
+
+@pytest.mark.parametrize("model", ["rsf", "gbm"])
+def test_backtest_runs_nonlinear_models(model):
+    # the non-linear ensemble methods (RSF, gradient-boosted survival) must ride
+    # the same harness as cox and recover the planted signal across origins —
+    # they exist so the verdict isn't fixated on one model class. Small corpus +
+    # few origins keep these ensemble fits fast (the real comparison is the
+    # offline head-to-head script, not the unit test).
+    corpus, ev, _ = synth_weaponization(
+        n=2500, signal=1.8, seed=3, start="2020-01-01", span_days=1100
+    )
+    features = build_publication_features(corpus)
+    origins = make_origins("2023-09-01", start="2022-01-01", min_followup_days=120)
+    res = rolling_origin_backtest(
+        corpus, ev, features, "2023-09-01", origins, model=model,
+        horizons=(30, 90, 180),
+    )
+    agg = res["aggregate"]
+    assert agg["n_origins"] >= 3
+    assert agg["horizon_auc"]["90"]["mean"] > 0.6
+    assert agg["test_events_total"] > 0
 
 
 def test_backtest_permutation_is_chance_level():
