@@ -106,3 +106,46 @@ def test_cure_feature_cols_exclude_meta():
 
     model = fit_cure(_synth_cure())
     assert model.feature_cols_ == ["feat_x"]
+
+
+def test_cure_loglogistic_gradient_matches_finite_difference():
+    from scipy.optimize import approx_fprime
+
+    from temporal_exploit.cure import _objective
+
+    rng = np.random.default_rng(5)
+    n, p = 200, 2
+    Xs = rng.normal(size=(n, p))
+    logt = np.log(rng.uniform(1.0, 300.0, n))
+    observed = rng.random(n) < 0.4
+    ridge = 0.7
+    theta = rng.normal(scale=0.3, size=2 * p + 3)
+    _, grad = _objective(theta, Xs, logt, observed, ridge, latency="loglogistic")
+    fd = approx_fprime(
+        theta, lambda th: _objective(th, Xs, logt, observed, ridge, latency="loglogistic")[0], 1e-6
+    )
+    assert np.allclose(grad, fd, rtol=1e-4, atol=1e-4)
+
+
+def test_cure_auto_selects_lower_aic_latency():
+    from temporal_exploit.cure import LATENCY_FAMILIES, fit_cure
+
+    frame = _synth_cure(n=2500)
+    aics = {fam: fit_cure(frame, latency=fam).aic_ for fam in LATENCY_FAMILIES}
+    auto = fit_cure(frame, latency="auto")
+    assert auto.latency_ in LATENCY_FAMILIES and auto.aic_ is not None
+    assert auto.latency_ == min(aics, key=aics.get)
+
+
+def test_cure_recalibration_is_monotone():
+    from temporal_exploit.cure import fit_cure
+
+    frame = _synth_cure()
+    model = fit_cure(frame, latency="weibull")
+    sub = frame.head(200)
+    before = model.survival_at(sub, [30])[:, 0]
+    model.recalibrate(frame, [30, 100])
+    after = model.survival_at(sub, [30])[:, 0]
+    order = np.argsort(before)
+    assert np.all(np.diff(after[order]) >= -1e-9)   # monotone in the original prediction
+    assert np.all((after >= 0.0) & (after <= 1.0))
