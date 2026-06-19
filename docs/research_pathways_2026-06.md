@@ -197,8 +197,10 @@ revive it.
   **ranking is provably unchanged** (AUC@90 identical 0.8173 = 0.8173). But it
   **worsened the mean IPA** (@90 −0.003 → −0.092) while leaving the **median
   unchanged** — i.e. on event-starved origins the cross-fit learns a *harmful*
-  temperature from ~7 events. Same rare-event recalibration fragility the
-  isotonic attempt showed. Guarded with `min_events=40`; **recommendation:
+  temperature from ~7 events. A `min_events=40` guard cuts the @90 harm ~80 %
+  (−0.092 → −0.020) but @180 stays bad (−0.091): even ≥40-event origins have
+  unstable 180-day calibration (17.7 % subcohort drop). Same rare-event
+  recalibration fragility the isotonic attempt showed. **Recommendation:
   recalibration OFF for in-wild.** RCLL (the proper-metric half of this pathway)
   remains worth adding as a *reporting* change — it may show IPA≈0 is partly a
   non-proper-metric artifact — but it does not change the model.
