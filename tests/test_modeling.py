@@ -417,3 +417,13 @@ def test_truncated_cindex_matches_harrell_on_uncensored():
     harrell = concordance_index(dur, -risk, ev)
     assert abs(tc - harrell) < 1e-9
     assert 0.0 <= truncated_cindex(dur, ev, risk, float(np.median(dur))) <= 1.0
+
+
+def test_prepare_modeling_frame_rejects_nan_features():
+    labels = pd.DataFrame({
+        "cve_id": ["A"], "published": pd.to_datetime(["2024-01-01"], utc=True),
+        "duration_days": [10.0], "event_observed": [True], "negative_duration_flag": [False],
+    })
+    features = pd.DataFrame({"cve_id": ["A"], "feat": [float("nan")]})
+    with pytest.raises(ValueError, match="NaN in feature"):
+        prepare_modeling_frame(labels, features)

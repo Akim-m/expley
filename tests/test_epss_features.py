@@ -93,3 +93,23 @@ def test_provenance_covers_every_emitted_feature_family(tmp_path) -> None:
         if column == "cve_id":
             continue
         assert column in families
+
+
+def test_nan_percentile_filled_to_zero(tmp_path):
+    # a reading with valid epss but NaN percentile must not leak NaN into features
+    epss_path = tmp_path / "epss_history.parquet"
+    pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"],
+            "date": pd.to_datetime(["2024-01-05"], utc=True),
+            "epss": [0.42],
+            "percentile": [float("nan")],
+        }
+    ).to_parquet(epss_path)
+    corpus = pd.DataFrame(
+        {"cve_id": ["CVE-2024-0001"], "published": pd.to_datetime(["2024-01-01"], utc=True)}
+    )
+    feat = build_epss_at_publication(corpus, str(epss_path)).set_index("cve_id")
+    assert feat.loc["CVE-2024-0001", "epss_at_publication"] == 0.42
+    assert feat.loc["CVE-2024-0001", "epss_percentile_at_publication"] == 0.0
+    assert feat.loc["CVE-2024-0001", "epss_at_publication_missing"] == 0
