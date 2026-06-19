@@ -63,6 +63,36 @@ def test_call_signs_body_with_hmac_sha256(monkeypatch):
     assert captured["url"].endswith("/reports/query")
 
 
+def test_fetch_raises_on_error_response(monkeypatch):
+    # Shadowserver can return a JSON error object (HTTP 200); fetch must surface
+    # it clearly instead of crashing in _normalize when it iterates a dict.
+    monkeypatch.setenv("SHADOWSERVER_API_KEY", "k")
+    monkeypatch.setenv("SHADOWSERVER_API_SECRET", "s")
+    monkeypatch.setattr(
+        ShadowserverConnector, "_call",
+        lambda self, m, p, k, s, t: {"error": "unknown report"},
+    )
+    with pytest.raises(RuntimeError, match="unknown report"):
+        ShadowserverConnector().fetch()
+
+
+def test_fetch_iterates_dates_keeps_earliest(monkeypatch):
+    monkeypatch.setenv("SHADOWSERVER_API_KEY", "k")
+    monkeypatch.setenv("SHADOWSERVER_API_SECRET", "s")
+    seen = []
+
+    def fake_call(self, method, params, key, secret, timeout):
+        seen.append(params.get("date"))
+        # the later-queried day reports an EARLIER first-seen for the same CVE
+        ts = "2024-01-01" if params["date"] == "2024-02-05" else "2024-03-01"
+        return [{"timestamp": ts, "cve": "CVE-2024-9"}]
+
+    monkeypatch.setattr(ShadowserverConnector, "_call", fake_call)
+    frame = ShadowserverConnector().fetch(dates=["2024-01-05", "2024-02-05"])
+    assert seen == ["2024-01-05", "2024-02-05"]  # one query per day
+    assert frame["shadowserver_first_seen"].iloc[0] == pd.Timestamp("2024-01-01", tz="UTC")
+
+
 def test_fetch_normalizes_via_call(monkeypatch):
     monkeypatch.setenv("SHADOWSERVER_API_KEY", "k")
     monkeypatch.setenv("SHADOWSERVER_API_SECRET", "s")
