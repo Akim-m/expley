@@ -84,6 +84,22 @@ def test_backtest_augment_fn_is_called_and_consumed():
     assert res["aggregate"]["horizon_auc"]["90"]["mean"] > 0.5
 
 
+def test_backtest_augment_fn_rejects_non_numeric():
+    # a non-numeric augment column would be silently dropped by the numeric-only
+    # feature selection; the hook must fail loud instead of doing nothing.
+    corpus, ev, features = _setup()
+    origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
+
+    def bad_augment(t):
+        return pd.DataFrame({"cve_id": corpus["cve_id"], "label": "x"})
+
+    with pytest.raises(ValueError, match="numeric"):
+        rolling_origin_backtest(
+            corpus, ev, features, "2024-06-01", origins, model="cox",
+            horizons=(90,), augment_fn=bad_augment,
+        )
+
+
 def test_backtest_temperature_preserves_ranking():
     # temperature recalibration rescales absolute probabilities only — it is
     # monotone in S, so per-origin horizon-AUC (a ranking metric) must be

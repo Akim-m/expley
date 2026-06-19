@@ -52,7 +52,13 @@ def stack_source(t: pd.Timestamp) -> pd.DataFrame:
     src_pub = pd.to_datetime(src["published"], utc=True)
     src_frame = prepare_modeling_frame(src[src_pub < t], features)
     if len(src_frame) > SRC_CAP:
-        src_frame = src_frame.sample(n=SRC_CAP, random_state=0).reset_index(drop=True)
+        # stratified cap: keep all events (the precision driver), sample censored
+        ev_rows = src_frame[src_frame["event_observed"].astype(bool)]
+        cn_rows = src_frame[~src_frame["event_observed"].astype(bool)]
+        n_cn = max(0, SRC_CAP - len(ev_rows))
+        src_frame = pd.concat(
+            [ev_rows, cn_rows.sample(n=min(n_cn, len(cn_rows)), random_state=0)]
+        ).reset_index(drop=True)
     model = fit_cox(src_frame)
     risk = model.predict_partial_hazard(X_all[model.feature_cols_])
     return pd.DataFrame({"cve_id": X_all.index, "source_risk": np.log(np.asarray(risk))})
