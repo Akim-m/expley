@@ -90,3 +90,31 @@ def test_refresh_vulncheck_fetches_with_token(monkeypatch, tmp_path):
     by = {e["source"]: e for e in entries}
     assert by["vulncheck_kev"]["rows"] == 1 and by["vulncheck_kev"]["status"] == "ok"
     assert (tmp_path / "live" / "vulncheck_kev.parquet").exists()
+
+
+def test_refresh_nvdplus_off_by_default(monkeypatch, tmp_path):
+    _stub_keyless(monkeypatch)
+    entries = refresh_command(
+        str(tmp_path / "live"), cache_dir=str(tmp_path / "cache"), repo_dir=None,
+        vulncheck_token="tok",
+    )
+    assert "nvdplus" not in {e["source"] for e in entries}  # opt-in (heavy download)
+
+
+def test_refresh_nvdplus_opt_in_with_token(monkeypatch, tmp_path):
+    from temporal_exploit.fetch import nvdplus
+
+    _stub_keyless(monkeypatch)
+    monkeypatch.setattr(
+        nvdplus.NvdPlusConnector, "fetch",
+        lambda self, token: pd.DataFrame(
+            {"cve_id": ["CVE-N"], "published": pd.to_datetime(["2024-01-01"], utc=True)}
+        ),
+    )
+    entries = refresh_command(
+        str(tmp_path / "live"), cache_dir=str(tmp_path / "cache"), repo_dir=None,
+        vulncheck_token="tok", with_nvdplus=True,
+    )
+    by = {e["source"]: e for e in entries}
+    assert by["nvdplus"]["rows"] == 1 and by["nvdplus"]["status"] == "ok"
+    assert (tmp_path / "live" / "cve_corpus.parquet").exists()

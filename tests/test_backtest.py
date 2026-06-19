@@ -1,9 +1,54 @@
 import pandas as pd
 import pytest
 
-from temporal_exploit.backtest import make_origins, rolling_origin_backtest
+from temporal_exploit.backtest import (
+    make_origins,
+    paired_origin_deltas,
+    rolling_origin_backtest,
+)
 from temporal_exploit.features import build_publication_features
 from temporal_exploit.simulate import synth_weaponization
+
+
+def _bt(per_origin):
+    return {"per_origin": per_origin}
+
+
+def _o(origin, auc90):
+    return {"origin": origin, "horizon_auc": {"90": auc90}, "ipa": {"90": 0.0}}
+
+
+def test_paired_origin_deltas_pairs_shared_origins():
+    challenger = _bt([_o("2022-01-01", 0.80), _o("2022-04-01", 0.70), _o("2022-07-01", 0.90)])
+    baseline = _bt([_o("2022-01-01", 0.75), _o("2022-04-01", 0.72), _o("2022-07-01", 0.85)])
+    out = paired_origin_deltas(challenger, baseline, metric="horizon_auc", horizon=90)
+    assert out["n_paired"] == 3
+    assert out["mean_delta"] == pytest.approx((0.05 - 0.02 + 0.05) / 3)
+    assert out["win_frac"] == pytest.approx(2 / 3)
+    assert out["ci95"][0] < out["mean_delta"] < out["ci95"][1]
+
+
+def test_paired_origin_deltas_uses_only_shared_origins():
+    challenger = _bt([_o("2022-01-01", 0.80), _o("2022-04-01", 0.70)])
+    baseline = _bt([_o("2022-01-01", 0.75), _o("2022-07-01", 0.85)])
+    out = paired_origin_deltas(challenger, baseline, metric="horizon_auc", horizon=90)
+    assert out["n_paired"] == 1
+    assert out["origins"] == ["2022-01-01"]
+
+
+def test_paired_origin_deltas_skips_none_metric():
+    challenger = _bt([_o("a", 0.80), _o("b", None)])
+    baseline = _bt([_o("a", 0.75), _o("b", 0.60)])
+    out = paired_origin_deltas(challenger, baseline, metric="horizon_auc", horizon=90)
+    assert out["n_paired"] == 1
+
+
+def test_paired_origin_deltas_one_pair_has_no_se():
+    out = paired_origin_deltas(_bt([_o("a", 0.8)]), _bt([_o("a", 0.7)]), metric="horizon_auc", horizon=90)
+    assert out["n_paired"] == 1
+    assert out["se"] is None
+    assert out["ci95"] is None
+    assert out["mean_delta"] == pytest.approx(0.1)
 
 
 def test_make_origins_quarterly_leaves_followup():
