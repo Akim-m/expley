@@ -39,12 +39,16 @@ def test_parse_handles_bare_and_wrapped_entries():
     assert row["reference_count"] == 2
 
 
-def test_fetch_downloads_backup(monkeypatch):
+def test_fetch_downloads_backup(monkeypatch, tmp_path):
+    # _download now streams to a temp file and returns its PATH; fetch unlinks it
+    zpath = tmp_path / "nvd.zip"
+    zpath.write_bytes(_zip({"data": [ENTRY]}))
     monkeypatch.setattr(NvdPlusConnector, "_backup_url", lambda self, t: "https://x/nvd.zip")
-    monkeypatch.setattr(NvdPlusConnector, "_download", lambda self, u: _zip({"data": [ENTRY]}))
+    monkeypatch.setattr(NvdPlusConnector, "_download", lambda self, u: str(zpath))
     df = NvdPlusConnector().fetch("tok")
     assert list(df["cve_id"]) == ["CVE-2026-1"]
     assert str(df["published"].dt.tz) == "UTC"
+    assert not zpath.exists()  # fetch cleaned up the temp file
 
 
 def test_parse_handles_gzipped_members():

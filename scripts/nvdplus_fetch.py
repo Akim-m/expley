@@ -3,10 +3,13 @@
 Token from VULNCHECK_API_TOKEN (never hard-coded). ~150 MB download / 359k CVEs;
 check `free -g` first. Merge keeps the latest last_modified per cve_id.
 """
+import logging
 import os
 from pathlib import Path
 
 from temporal_exploit.fetch.nvdplus import NvdPlusConnector
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")  # show download progress
 
 OUT = Path("data/live/cve_corpus.parquet")
 
