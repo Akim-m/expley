@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from temporal_exploit.backtest import make_origins, rolling_origin_backtest
+from temporal_exploit.backtest import make_origins, paired_origin_deltas, rolling_origin_backtest
 from temporal_exploit.cli import (
     EVENT_SOURCES,
     IN_WILD_SOURCES,
@@ -43,6 +43,7 @@ print(f"in_wild: {len(origins)} origins from {START}, clock_start={clock_start},
       f"features={features.shape[1] - 1}", flush=True)
 
 results = {}
+full = {}
 for model in MODELS:
     t0 = time.time()
     res = rolling_origin_backtest(
@@ -51,6 +52,7 @@ for model in MODELS:
     )
     agg = res["aggregate"]
     results[model] = agg
+    full[model] = res
     dt = time.time() - t0
 
     def g(metric, h, stat="mean"):
@@ -70,6 +72,30 @@ for model in MODELS:
         flush=True,
     )
 
+# Cross-model uncertainty: per-origin paired deltas vs cox on the SHARED origins.
+# A challenger only genuinely beats cox if its 95% CI excludes 0 -- otherwise the
+# gap (e.g. a 0.005 AUC/c-index lead) is within the quarter-to-quarter noise. This
+# is what the per-model `sd` alone could not tell you: it is the paired test.
+paired_vs_cox = {}
+if "cox" in full:
+    for model in MODELS:
+        if model == "cox":
+            continue
+        blocks = {
+            f"{metric}_{h}": paired_origin_deltas(full[model], full["cox"], metric, h)
+            for metric, h in (("horizon_auc", 90), ("ipa", 90))
+        }
+        paired_vs_cox[model] = blocks
+        a90 = blocks["horizon_auc_90"]
+        verdict = "within error" if (a90["ci95"] is None or a90["ci95"][0] <= 0 <= a90["ci95"][1]) \
+            else ("beats cox" if a90["mean_delta"] > 0 else "worse than cox")
+        print(
+            f"  paired {model}-cox AUC@90: delta {a90['mean_delta']:+.4f} "
+            f"CI {a90['ci95']} (n={a90['n_paired']}, win {a90['win_frac']}) -> {verdict}",
+            flush=True,
+        )
+
+output = {"baseline": "cox", "per_model": results, "paired_vs_cox": paired_vs_cox}
 with open("artifacts/inwild_headtohead.json", "w") as fh:
-    json.dump(results, fh, indent=2, sort_keys=True)
+    json.dump(output, fh, indent=2, sort_keys=True)
 print("\nwrote artifacts/inwild_headtohead.json", flush=True)
