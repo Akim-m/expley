@@ -1,6 +1,25 @@
 import pandas as pd
 
-from temporal_exploit.cli import load_optional_event
+from temporal_exploit.cli import (
+    EVENT_SOURCES,
+    load_optional_event,
+    sources_for_label_set,
+)
+from temporal_exploit.labels import IN_WILD_SOURCES
+
+
+def test_sources_for_in_wild_excludes_tooling_only_sources():
+    # in-wild labels use only the catalog sources; loading the 188k-row poc
+    # source (and metasploit/nuclei/exploitdb) for an in-wild backtest is wasted.
+    s = sources_for_label_set("in_wild")
+    assert set(s) == set(IN_WILD_SOURCES)
+    assert "poc" not in s and "metasploit" not in s and "exploitdb" not in s
+
+
+def test_sources_for_first_weaponization_uses_all():
+    s = sources_for_label_set("first_weaponization")
+    assert set(s) == set(EVENT_SOURCES)
+    assert "poc" in s
 
 
 def test_projects_to_only_needed_columns(tmp_path):

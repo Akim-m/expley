@@ -32,6 +32,8 @@ MODELS = sys.argv[1].split(",") if len(sys.argv) > 1 else ["cox", "rsf", "gbm"]
 corpus = load_parquet(OUT_DIR, "cve_corpus", columns=["cve_id", "published"])
 event_frames = {}
 for source, (parquet_name, date_col) in EVENT_SOURCES.items():
+    if source not in IN_WILD_SOURCES:  # in-wild head-to-head: skip poc (188k)/tooling loads
+        continue
     frame = load_optional_event(OUT_DIR, parquet_name, date_col)
     if frame is not None:
         event_frames[source] = (frame, date_col)
