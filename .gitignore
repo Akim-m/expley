@@ -42,3 +42,6 @@ data/live/
 data/merged/
 data/cache/
 .fetch_cache/
+# git-clone caches from refresh/fetch runs (regenerable; can be 100s of MB)
+nuclei/
+poc/

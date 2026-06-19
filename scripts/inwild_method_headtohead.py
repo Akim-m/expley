@@ -9,6 +9,7 @@ Loads corpus/events/features once; varies only the model on identical origins.
 import json
 import sys
 import time
+from pathlib import Path
 
 import pandas as pd
 
@@ -21,7 +22,7 @@ from temporal_exploit.cli import (
 )
 from temporal_exploit.loaders import load_parquet
 
-OUT_DIR = "dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out"
+OUT_DIR = Path("dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out")
 ARTIFACT_DIR = "artifacts/bt_epss"
 SNAPSHOT = "2026-03-14"
 START = "2022-01-01"
