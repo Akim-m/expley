@@ -77,6 +77,9 @@ def test_backtest_recovers_signal_across_origins():
     # spread the single split couldn't report
     assert agg["horizon_auc"]["90"]["mean"] > 0.6
     assert agg["horizon_auc"]["90"]["sd"] >= 0.0
+    # PR-AUC (average precision) flows into the same aggregate at the same horizons
+    assert "90" in agg["horizon_pr_auc"]
+    assert 0.0 <= agg["horizon_pr_auc"]["90"]["mean"] <= 1.0
     # operational: flagging the top decile catches more than its share of weaponizers
     assert agg["recall_at_top"]["90"]["mean"] > 0.10
     # honesty companion: the subcohort-drop fraction is reported per horizon and

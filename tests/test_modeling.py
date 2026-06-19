@@ -202,6 +202,20 @@ def test_evaluate_survival_cox():
     assert res["n_test"] == len(test)
 
 
+def test_evaluate_survival_reports_horizon_pr_auc():
+    # PR-AUC / average precision is the informative metric for rare positives;
+    # reported on the same fully-observed subcohort as horizon_auc, same horizons.
+    labels, features = _synthetic(n=140)
+    frame = prepare_modeling_frame(labels, features)
+    train, test = time_split_frame(frame, "2023-09-01")
+    model = fit_cox(train)
+    res = evaluate_survival(model, train, test, horizons=(30, 90))
+    assert "horizon_pr_auc" in res
+    assert set(res["horizon_pr_auc"]) == set(res["horizon_auc"])
+    for v in res["horizon_pr_auc"].values():
+        assert 0.0 <= v <= 1.0
+
+
 def test_evaluate_survival_rsf():
     labels, features = _synthetic(n=140)
     frame = prepare_modeling_frame(labels, features)
