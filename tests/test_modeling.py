@@ -379,3 +379,43 @@ def test_survival_at_and_risk_dispatch_cure():
     assert np.all((surv > 0) & (surv <= 1))
     risk = _risk_scores(model, X, "cure")
     assert risk.shape == (5,)
+
+
+def test_bootstrap_cindex_ci_brackets_point_and_paired_self_delta_zero():
+    from sksurv.metrics import concordance_index_ipcw
+    from sksurv.util import Surv
+    from temporal_exploit.modeling import bootstrap_cindex_ci, paired_cindex_delta_ci
+
+    rng = np.random.default_rng(0)
+    n = 400
+    risk = rng.normal(size=n)
+    dur = np.clip(100 - 20 * risk + rng.normal(0, 10, n), 1, None)
+    ev = rng.random(n) < 0.5
+    y = Surv.from_arrays(event=ev, time=dur)
+    tau = float(np.quantile(dur, 0.9))
+    point = concordance_index_ipcw(y, y, risk, tau=tau)[0]
+
+    res = bootstrap_cindex_ci(y, y, risk, tau, n_boot=200, seed=0)
+    lo, hi = res["ci95"]
+    assert lo < point < hi and res["se"] > 0 and res["n_boot"] == 200
+
+    # a model vs itself: delta ~ 0, CI straddles 0
+    pair = paired_cindex_delta_ci(y, y, risk, risk, tau, n_boot=200, seed=0)
+    assert abs(pair["delta"]) < 1e-9
+    assert pair["ci95"][0] <= 0 <= pair["ci95"][1]
+
+
+def test_truncated_cindex_matches_harrell_on_uncensored():
+    from lifelines.utils import concordance_index
+    from temporal_exploit.modeling import truncated_cindex
+
+    rng = np.random.default_rng(1)
+    n = 300
+    risk = rng.normal(size=n)
+    dur = np.clip(100 - 20 * risk + rng.normal(0, 5, n), 1, None)
+    ev = np.ones(n, dtype=bool)  # fully observed
+    tau = float(dur.max()) + 1.0  # tau above everything -> no truncation
+    tc = truncated_cindex(dur, ev, risk, tau)
+    harrell = concordance_index(dur, -risk, ev)
+    assert abs(tc - harrell) < 1e-9
+    assert 0.0 <= truncated_cindex(dur, ev, risk, float(np.median(dur))) <= 1.0
