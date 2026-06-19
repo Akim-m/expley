@@ -67,3 +67,17 @@ def test_poc_connector_emits_row_per_source(monkeypatch):
     assert list(frame.columns) == ["cve_id", "poc_source", "poc_first_seen", "poc_path"]
     assert set(frame["poc_source"]) == set(PocConnector.SOURCES)
     assert set(frame["cve_id"]) == {"CVE-2021-0001"}
+
+
+def test_earliest_introduction_skips_on_pickaxe_timeout(monkeypatch, tmp_path):
+    import subprocess
+
+    from temporal_exploit.fetch import gitmine
+
+    def fake_run(cmd, **kwargs):
+        assert kwargs.get("timeout") is not None  # the call is bounded
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(gitmine.subprocess, "run", fake_run)
+    # a stalled pair is skipped (None), not propagated as a crash
+    assert gitmine.earliest_introduction(tmp_path, "CVE-2021-44228", "some/path") is None
