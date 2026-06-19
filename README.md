@@ -59,7 +59,7 @@ This realizes steps 2–8 of the plan below; step 1 (handover) is the source mat
 
 Open threads — the detailed backlog lives in [`docs/progress.md`](docs/progress.md):
 
-- **EPSS-enriched cure run (deferred for memory)** — the mixture-cure IPA win above was measured on the 68-feature no-EPSS set; the EPSS-at-publication scan needs ~5.8 GB RSS (pyarrow `isin` over the 375M-row file), so an EPSS-enriched + landmark in-wild cure run must be done at minimal baseline (a dedicated low-memory session). Worth confirming the cure-vs-cox IPA gap holds at the EPSS-enriched discrimination level (cox 0.849 / landmark 0.873).
+- **Cure model at long horizons** — the mixture-cure model fixes in-wild absolute calibration, but its IPA advantage over Cox is feature-dependent: clearly positive on the lean 68-feature set, ~0 (still ≥ Cox) once the strong EPSS-at-publication feature is added (both measured — see `docs/progress.md`). A mixture-cure with a richer latency (or per-cause cure fractions) is the next step if long-horizon absolute risk becomes a requirement. *(The EPSS-enriched run is no longer memory-blocked — the EPSS scan now peaks ~0.6 GB, see below.)*
 - **VulnCheck KEV + NVD live pulls** — VulnCheck (in-wild broadener) is wired+tested but needs `VULNCHECK_API_TOKEN`; NVD corpus refresh is blocked by service-side 503 (the bare-date connector bug is fixed). Run both when credentials/availability allow; honeypot feeds still unwired.
 - **Audit leftovers** (`docs/audit_2026-06-12.md`) — **mixture-cure landed** (`cure.py`, fixes IPA≈0) and **transition/per-cause test c-index landed** (`cause_specific_cindex`, None when undersupported). Still open: bootstrap CIs (Noether approximation shipped instead), exact truncated c-index, and validating the cure model at long horizons.
 - **Deep-model depth** — `--deep` wires DeepSurv into `train`; still open: a DeepHit competing-risks variant and architecture/epoch tuning. Optional `[deep]` extra; CUDA is auto-selected.
@@ -246,8 +246,10 @@ Rules of thumb on the full dataset:
 - `train --models cox,rsf` — the RSF is the RAM hog: the fitted forest holds
   per-leaf survival curves (~5 GB resident) plus batched prediction buffers.
   Budget ~10 GB free RAM and close other heavy apps first.
-- `build-dataset --epss-path ...` — the 375M-row EPSS history is streamed in
-  capped batches (~2 GB); don't run it concurrently with training.
+- `build-dataset --epss-path ...` — the 375M-row EPSS history is streamed with
+  `iter_batches` + a fixed-size per-CVE numpy reduction (**~0.6 GB peak**; an
+  earlier pyarrow `isin` pushdown filter retained ~5.8 GB). The full
+  EPSS+landmark build peaks ~1.3 GB process RSS, well within the laptop budget.
 - `train --deep` — DeepSurv evaluation is sampled (20k rows) to bound the
   survival-matrix size; training itself runs on the GPU.
 - Run one heavy job at a time. Two of the above concurrently is what causes
