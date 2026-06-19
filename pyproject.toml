@@ -16,6 +16,7 @@ dependencies = [
   "lifelines>=0.30.0",
   "matplotlib>=3.9",
   "seaborn>=0.13",
+  "ijson>=3.3",
 ]
 
 [project.optional-dependencies]

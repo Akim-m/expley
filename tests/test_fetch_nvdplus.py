@@ -56,6 +56,27 @@ def test_parse_handles_gzipped_members():
     assert list(df["cve_id"]) == ["CVE-2026-1"]
 
 
+def test_parse_streams_ndjson_member():
+    # some dumps are NDJSON (one JSON object per line) rather than a JSON array
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        nd = "\n".join(json.dumps({**ENTRY, "id": f"CVE-2026-{i}"}) for i in range(3))
+        zf.writestr("nvd.ndjson", nd)
+    df = NvdPlusConnector._parse(buf.getvalue())
+    assert list(df["cve_id"]) == ["CVE-2026-0", "CVE-2026-1", "CVE-2026-2"]
+
+
+def test_parse_chunks_across_boundary(monkeypatch):
+    # force several chunks so the concat path (not a single batch) is exercised
+    monkeypatch.setattr("temporal_exploit.fetch.nvdplus._CHUNK", 4)
+    entries = [{**ENTRY, "id": f"CVE-2026-{i}"} for i in range(11)]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("nvd.json", json.dumps({"data": entries}))
+    df = NvdPlusConnector._parse(buf.getvalue())
+    assert len(df) == 11 and df["cve_id"].is_unique
+
+
 def test_fetch_requires_token():
     with pytest.raises(ValueError):
         NvdPlusConnector().fetch("")
