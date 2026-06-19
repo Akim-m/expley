@@ -33,6 +33,9 @@ def test_backtest_recovers_signal_across_origins():
     assert agg["horizon_auc"]["90"]["sd"] >= 0.0
     # operational: flagging the top decile catches more than its share of weaponizers
     assert agg["recall_at_top"]["90"]["mean"] > 0.10
+    # honesty companion: the subcohort-drop fraction is reported per horizon and
+    # is a valid proportion (so a high-drop long horizon carries its own caveat)
+    assert 0.0 <= agg["horizon_auc_dropped_frac"]["90"] <= 1.0
 
 
 @pytest.mark.parametrize("model", ["rsf", "gbm"])
