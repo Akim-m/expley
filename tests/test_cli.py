@@ -556,3 +556,24 @@ def test_train_command_rejects_unknown_label_set(tmp_path):
     _synthetic_artifacts(artifact_dir)
     with pytest.raises(ValueError, match="label_set"):
         train_command(artifact_dir, "2023-09-01", tmp_path / "r", label_set="bogus")
+
+
+def test_build_dataset_description_text_features(tmp_path):
+    import json
+
+    from temporal_exploit.cli import build_dataset_command
+    from tests.fixtures.tiny_parquets import write_tiny_handover
+
+    out = tmp_path / "out"
+    art = tmp_path / "art"
+    out.mkdir()
+    write_tiny_handover(out)
+    build_dataset_command(out, art, snapshot_date="2026-03-14", description_text=True)
+
+    feats = pd.read_parquet(art / "publication_features.parquet")
+    assert "desc_kw_remote" in feats.columns and "description_fresh" in feats.columns
+    assert "description" not in feats.columns  # raw text never leaks into features
+    m = json.loads((art / "manifest.json").read_text())
+    assert m["description_features_enabled"] is True
+    prov = pd.read_csv(art / "feature_provenance.csv")
+    assert "publication_time_safe_freshness_gated" in set(prov["leakage_status"])

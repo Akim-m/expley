@@ -9,6 +9,11 @@ def write_tiny_handover(out_dir: Path) -> None:
         {
             "cve_id": ["CVE-2024-0001", "CVE-2024-0002"],
             "published": pd.to_datetime(["2024-01-01", "2024-02-01"], utc=True),
+            "last_modified": pd.to_datetime(["2024-01-03", "2024-02-02"], utc=True),
+            "description": [
+                "Remote attacker triggers a buffer overflow.",
+                "SQL injection allows authentication bypass.",
+            ],
             "cvss_v3_base": [9.8, 5.3],
             "cvss_v3_severity": ["CRITICAL", "MEDIUM"],
             "cwe_ids": [["CWE-79"], ["CWE-89"]],
