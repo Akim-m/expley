@@ -1,3 +1,4 @@
+import gzip
 import io
 import json
 import zipfile
@@ -44,6 +45,15 @@ def test_fetch_downloads_backup(monkeypatch):
     df = NvdPlusConnector().fetch("tok")
     assert list(df["cve_id"]) == ["CVE-2026-1"]
     assert str(df["published"].dt.tz) == "UTC"
+
+
+def test_parse_handles_gzipped_members():
+    # the real NVD++ backup zip stores gzip-compressed JSON members
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("nvd.json.gz", gzip.compress(json.dumps({"data": [ENTRY]}).encode()))
+    df = NvdPlusConnector._parse(buf.getvalue())
+    assert list(df["cve_id"]) == ["CVE-2026-1"]
 
 
 def test_fetch_requires_token():
