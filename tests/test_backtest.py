@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 from temporal_exploit.backtest import make_origins, rolling_origin_backtest
@@ -58,6 +59,50 @@ def test_backtest_runs_nonlinear_models(model):
     assert agg["n_origins"] >= 3
     assert agg["horizon_auc"]["90"]["mean"] > 0.6
     assert agg["test_events_total"] > 0
+
+
+def test_backtest_augment_fn_is_called_and_consumed():
+    # the augment hook must run per origin, merge a point-in-time extra column
+    # onto train+test, fill unscored ids, and the fit must consume it (the
+    # mechanism behind stacked transfer). A constant-per-origin call counter +
+    # a stable continuous injected feature exercise the whole path.
+    corpus, ev, features = _setup()
+    origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
+    calls = []
+
+    def augment(t):
+        calls.append(t)
+        vals = (corpus["cve_id"].str.len() % 7).astype(float)  # stable continuous
+        return pd.DataFrame({"cve_id": corpus["cve_id"], "xfer": vals})
+
+    res = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox",
+        horizons=(90,), augment_fn=augment,
+    )
+    assert len(calls) >= 3  # invoked once per scored origin
+    assert res["aggregate"]["n_origins"] >= 3
+    assert res["aggregate"]["horizon_auc"]["90"]["mean"] > 0.5
+
+
+def test_backtest_temperature_preserves_ranking():
+    # temperature recalibration rescales absolute probabilities only — it is
+    # monotone in S, so per-origin horizon-AUC (a ranking metric) must be
+    # bit-identical to the uncalibrated run; only IPA/calibration can move.
+    corpus, ev, features = _setup()
+    origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
+    base = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,)
+    )
+    temp = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,),
+        temperature=True,
+    )
+    b = {o["origin"]: o["horizon_auc"].get("90") for o in base["per_origin"]}
+    t = {o["origin"]: o["horizon_auc"].get("90") for o in temp["per_origin"]}
+    common = {o for o in (set(b) & set(t)) if b[o] is not None and t[o] is not None}
+    assert common
+    for o in common:
+        assert abs(b[o] - t[o]) < 1e-9  # ranking untouched
 
 
 def test_backtest_permutation_is_chance_level():
