@@ -1,9 +1,14 @@
 import pandas as pd
+import pyarrow.parquet as pq
 
 from temporal_exploit.epss_features import (
+    _epss_row_groups,
+    _iter_epss_batches,
+    _ns,
     build_epss_at_publication,
     epss_feature_provenance,
 )
+from tests.fixtures.tiny_parquets import write_epss_row_groups
 
 
 def _write_epss(path) -> str:
@@ -113,3 +118,97 @@ def test_nan_percentile_filled_to_zero(tmp_path):
     assert feat.loc["CVE-2024-0001", "epss_at_publication"] == 0.42
     assert feat.loc["CVE-2024-0001", "epss_percentile_at_publication"] == 0.0
     assert feat.loc["CVE-2024-0001", "epss_at_publication_missing"] == 0
+
+
+# --- date-based row-group skipping (the 375M-row file is 1 row group per date) ---
+
+
+def test_epss_row_groups_fixture_is_one_group_per_date(tmp_path):
+    p = write_epss_row_groups(
+        tmp_path,
+        {
+            "2024-01-01": [("CVE-2024-0001", 0.1, 0.3)],
+            "2024-02-01": [("CVE-2024-0001", 0.4, 0.8)],
+            "2024-03-01": [("CVE-2024-0001", 0.5, 0.9)],
+        },
+    )
+    assert pq.ParquetFile(p).metadata.num_row_groups == 3
+
+
+def test_epss_row_groups_selects_only_in_range(tmp_path):
+    p = write_epss_row_groups(
+        tmp_path,
+        {
+            "2024-01-01": [("CVE-2024-0001", 0.1, 0.3)],
+            "2024-02-01": [("CVE-2024-0001", 0.4, 0.8)],
+            "2024-03-01": [("CVE-2024-0001", 0.5, 0.9)],
+        },
+    )
+    pf = pq.ParquetFile(p)
+    assert _epss_row_groups(pf, None, None) == [0, 1, 2]
+    # upper bound drops the 2024-03-01 group
+    assert _epss_row_groups(pf, None, _ns(["2024-02-15"])[0]) == [0, 1]
+    # lower bound drops the 2024-01-01 group
+    assert _epss_row_groups(pf, _ns(["2024-01-15"])[0], None) == [1, 2]
+    # both bounds -> only the middle group
+    assert _epss_row_groups(pf, _ns(["2024-01-15"])[0], _ns(["2024-02-15"])[0]) == [1]
+    # boundary dates are inclusive
+    assert _epss_row_groups(pf, _ns(["2024-02-01"])[0], _ns(["2024-02-01"])[0]) == [1]
+
+
+def test_iter_epss_batches_skips_out_of_range_row_groups(tmp_path):
+    p = write_epss_row_groups(
+        tmp_path,
+        {
+            "2024-01-01": [("CVE-2024-0001", 0.1, 0.3)],
+            "2024-02-01": [("CVE-2024-0002", 0.4, 0.8)],
+            "2024-03-01": [("CVE-2024-0003", 0.5, 0.9)],
+        },
+    )
+    seen = []
+    for batch in _iter_epss_batches(p, None, _ns(["2024-02-15"])[0], batch_size=1024):
+        seen.extend(batch.column("cve_id").to_pylist())
+    assert seen == ["CVE-2024-0001", "CVE-2024-0002"]  # 2024-03-01 group never decoded
+
+
+def test_build_epss_at_publication_correct_when_late_row_group_skipped(tmp_path):
+    p = write_epss_row_groups(
+        tmp_path,
+        {
+            "2024-01-01": [("CVE-2024-0001", 0.10, 0.30)],
+            "2024-02-01": [("CVE-2024-0001", 0.40, 0.80), ("CVE-2024-0002", 0.20, 0.50)],
+            "2024-03-01": [("CVE-2024-0001", 0.55, 0.90), ("CVE-2024-0002", 0.60, 0.95)],
+        },
+    )
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0002"],
+            "published": pd.to_datetime(["2024-01-15", "2024-01-15"], utc=True),
+        }
+    )
+    # snapshot before the 2024-03-01 group -> that group is skipped by the pushdown,
+    # but the answer (first reading on/after publication within snapshot) is unchanged.
+    feat = build_epss_at_publication(corpus, p, snapshot_date="2024-02-15").set_index("cve_id")
+    assert feat.loc["CVE-2024-0001", "epss_at_publication"] == 0.40
+    assert feat.loc["CVE-2024-0002", "epss_at_publication"] == 0.20
+    assert feat.loc["CVE-2024-0001", "epss_at_publication_missing"] == 0
+
+
+def test_snapshot_before_all_row_groups_decodes_nothing(tmp_path):
+    # a snapshot earlier than the whole file -> no row group can hold an eligible
+    # reading, so selection is empty and every CVE is missing (zero decode).
+    p = write_epss_row_groups(
+        tmp_path,
+        {
+            "2024-01-01": [("CVE-2024-0001", 0.1, 0.3)],
+            "2024-02-01": [("CVE-2024-0001", 0.4, 0.8)],
+        },
+    )
+    pf = pq.ParquetFile(p)
+    assert _epss_row_groups(pf, None, _ns(["2023-06-01"])[0]) == []
+    corpus = pd.DataFrame(
+        {"cve_id": ["CVE-2024-0001"], "published": pd.to_datetime(["2020-01-01"], utc=True)}
+    )
+    feat = build_epss_at_publication(corpus, p, snapshot_date="2023-06-01").set_index("cve_id")
+    assert feat.loc["CVE-2024-0001", "epss_at_publication_missing"] == 1
+    assert feat.loc["CVE-2024-0001", "epss_at_publication"] == 0.0

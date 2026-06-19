@@ -57,6 +57,7 @@ load_parquet (loaders) → validate_columns (schema) → build_first_weaponizati
 - **splits.py** — time-based split on `published` at a fixed cutoff; writes locked `train/test_cve_ids.txt`. Never random K-fold.
 - **baselines.py** — Kaplan-Meier + Cox PH (lifelines). Both reject negative durations; callers must exclude `negative_duration_flag` rows first.
 - **evaluate.py** — naive event-rate-by-horizon (7/30/90/180 days) and event-source composition.
+- **epss_features.py / landmark.py** — the 375M-row `epss_history` is read by streaming `iter_batches` + numpy membership (`get_indexer`), reduced to one value per CVE (~300 MB RSS). **Do not** add an `isin(cve_ids)` pyarrow pushdown — it retained ~5 GB. The one safe pushdown is by **date**: `_iter_epss_batches` skips row groups outside `[earliest published, snapshot]` (the file is one row group per day), speeding up historical-snapshot builds with no result change.
 
 ## Non-negotiable constraints (these are how results stay valid)
 

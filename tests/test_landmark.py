@@ -8,6 +8,27 @@ from temporal_exploit.landmark import (
     landmark_feature_provenance,
     restart_clock,
 )
+from tests.fixtures.tiny_parquets import write_epss_row_groups
+
+
+def test_build_epss_at_landmark_correct_when_out_of_window_group_skipped(tmp_path):
+    # one row group per date; the 2024-03-01 group is past the landmark window
+    # and must be skipped without changing the (last-in-window) result.
+    p = write_epss_row_groups(
+        tmp_path,
+        {
+            "2024-01-05": [("CVE-2024-0001", 0.10, 0.30)],
+            "2024-01-20": [("CVE-2024-0001", 0.40, 0.80)],
+            "2024-03-01": [("CVE-2024-0001", 0.55, 0.90)],
+        },
+    )
+    corpus = pd.DataFrame(
+        {"cve_id": ["CVE-2024-0001"], "published": pd.to_datetime(["2024-01-01"], utc=True)}
+    )
+    feat = build_epss_at_landmark(corpus, p, landmark_days=30).set_index("cve_id")
+    # window [2024-01-01, 2024-01-31]; LAST in-window reading = 2024-01-20 -> 0.40
+    assert feat.loc["CVE-2024-0001", "epss_at_landmark"] == 0.40
+    assert feat.loc["CVE-2024-0001", "epss_at_landmark_missing"] == 0
 
 
 def _corpus():
