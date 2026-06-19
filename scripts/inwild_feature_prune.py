@@ -7,7 +7,6 @@ The 71 features are dominated by sparse one-hot blocks (20 CWE, ~10 ATT&CK-paren
 and asks whether the sparse blocks earn their parameters *prospectively* or just
 add variance. Same backtest, same origins — only the feature set changes.
 """
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -37,7 +36,7 @@ for source, (parquet_name, date_col) in EVENT_SOURCES.items():
     frame = load_optional_event(OUT_DIR, parquet_name, date_col)
     if frame is not None:
         event_frames[source] = (frame, date_col)
-features_full = pd.read_parquet(f"artifacts/bt_epss/publication_features.parquet")
+features_full = pd.read_parquet("artifacts/bt_epss/publication_features.parquet")
 keep = ["cve_id", "published"] + [c for c in DENSE if c in features_full.columns]
 features_dense = features_full[keep]
 
