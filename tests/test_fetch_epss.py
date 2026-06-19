@@ -15,7 +15,7 @@ CSV_TEXT = (
 
 def _patch(monkeypatch):
     blob = gzip.compress(CSV_TEXT.encode())
-    monkeypatch.setattr(epss, "_fetch_csv_gz", lambda url: blob)
+    monkeypatch.setattr(epss, "_fetch_csv_gz", lambda url, cache_dir=None: blob)
 
 
 def test_fetch_normalizes_snapshot(monkeypatch):

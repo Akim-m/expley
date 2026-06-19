@@ -200,7 +200,7 @@ def test_main_fetch_kev(tmp_path, monkeypatch):
     monkeypatch.setattr(
         kev,
         "_fetch_json",
-        lambda url: {
+        lambda url, cache_dir=None: {
             "vulnerabilities": [{"cveID": "CVE-2024-0001", "dateAdded": "2024-01-20"}]
         },
     )
@@ -296,7 +296,7 @@ def test_main_fetch_zeroday(tmp_path, monkeypatch):
     from temporal_exploit.fetch import zeroday
 
     csv = "CVE,Vendor,Product,Type,Date Discovered,Date Patched\nCVE-2021-0001,V,P,RCE,2021-01-05,2021-02-01\n"
-    monkeypatch.setattr(zeroday, "_fetch_csv", lambda url: csv)
+    monkeypatch.setattr(zeroday, "_fetch_csv", lambda url, cache_dir=None: csv)
     main(["fetch", "--source", "zeroday", "--live-dir", str(tmp_path / "live")])
     saved = pd.read_parquet(tmp_path / "live" / "google_0day.parquet")
     assert set(saved["cve_id"]) == {"CVE-2021-0001"}

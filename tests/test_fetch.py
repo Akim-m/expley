@@ -12,7 +12,7 @@ def test_fetch_returns_normalized_frame(monkeypatch):
     monkeypatch.setattr(
         kev,
         "_fetch_json",
-        lambda url: {
+        lambda url, cache_dir=None: {
             "vulnerabilities": [
                 {"cveID": "CVE-2024-0001", "dateAdded": "2024-01-20"},
                 {"cveID": "CVE-2024-0002", "dateAdded": "2024-02-01"},
@@ -31,7 +31,7 @@ def test_fetch_dedupes_to_earliest(monkeypatch):
     monkeypatch.setattr(
         kev,
         "_fetch_json",
-        lambda url: {
+        lambda url, cache_dir=None: {
             "vulnerabilities": [
                 {"cveID": "CVE-2024-0001", "dateAdded": "2024-03-01"},
                 {"cveID": "CVE-2024-0001", "dateAdded": "2024-01-20"},
@@ -48,7 +48,7 @@ def test_save_round_trips_and_validates(monkeypatch, tmp_path):
     monkeypatch.setattr(
         kev,
         "_fetch_json",
-        lambda url: {
+        lambda url, cache_dir=None: {
             "vulnerabilities": [
                 {"cveID": "CVE-2024-0001", "dateAdded": "2024-01-20"},
             ]

@@ -40,4 +40,5 @@ reports/
 # Live-fetched data
 data/live/
 data/merged/
+data/cache/
 .fetch_cache/

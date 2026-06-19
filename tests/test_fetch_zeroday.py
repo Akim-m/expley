@@ -28,7 +28,7 @@ def test_parse_filters_dedupes_and_coerces_dates():
 
 
 def test_connector_fetches_via_seam(monkeypatch):
-    monkeypatch.setattr(zeroday, "_fetch_csv", lambda url: SAMPLE)
+    monkeypatch.setattr(zeroday, "_fetch_csv", lambda url, cache_dir=None: SAMPLE)
     frame = ZerodayConnector().fetch()
     assert set(frame["cve_id"]) == {"CVE-2021-0001", "CVE-2022-0009"}
     assert ZerodayConnector.name == "google_0day"
