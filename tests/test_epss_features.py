@@ -6,8 +6,22 @@ from temporal_exploit.epss_features import (
     _iter_epss_batches,
     _ns,
     build_epss_at_publication,
+    epss_feature_columns,
     epss_feature_provenance,
 )
+
+
+def test_epss_feature_columns_selects_epss_prefixed():
+    cols = [
+        "cve_id", "published", "cvss_v3_base",
+        "epss_at_publication", "epss_percentile_at_publication",
+        "epss_at_publication_missing", "epss_at_landmark",
+    ]
+    assert epss_feature_columns(cols) == [
+        "epss_at_publication", "epss_percentile_at_publication",
+        "epss_at_publication_missing", "epss_at_landmark",
+    ]
+    assert epss_feature_columns(["cve_id", "cvss_v3_base"]) == []
 from tests.fixtures.tiny_parquets import write_epss_row_groups
 
 
