@@ -2,9 +2,22 @@
 
 Living status + roadmap for the temporal-exploit modeling system. Update as work lands.
 
-Last updated: 2026-06-12.
+Last updated: 2026-06-19.
+
+## ►► START HERE — handoff for the next agent
+
+- **Where we are.** Penalized **Cox + EPSS features is the in-wild model** (AUC@90 ≈ 0.82, recall@top-decile ≈ 0.51, IPA ≈ 0). Evaluated by the **rolling-origin (walk-forward) backtest** (`temporal_exploit.backtest`; driver `scripts/inwild_method_headtohead.py`). For time-to-first-weaponization the headline is xgb-AFT 0.598 / cox 0.565 (PoC-dominated — see the framing caveat in CLAUDE.md).
+- **The one thing to internalize.** The in-wild ceiling is **DATA-LIMITED (396 events), not model- or calibration-limited.** This is now proven by exhausting the alternatives: RSF, gradient-boosted survival, XGBoost-AFT, mixture-cure, **stacked transfer, and temperature recalibration all ≤ baseline Cox** (this session). IPA≈0 is the rare-event reality, not a bug to fix with a fancier model.
+- **Highest-leverage next step (roadmap #1) — raise the ceiling with more/earlier LABELS.** **VulnCheck KEV has a free community API (~173 % larger than CISA KEV, ~27 days earlier);** the connector is wired (`src/temporal_exploit/fetch/vulncheck.py`) and just needs `VULNCHECK_API_TOKEN`. **Shadowserver** honeypot feeds are another free in-wild label source. Both could 2–4× the true in-wild events. See `docs/research_pathways_2026-06.md` §Pathway 1. Use *first-reported-evidence date*, not catalog-add date.
+- **Do NOT redo these documented dead-ends:** mixture-cure (non-identifiable — no KM plateau), RSF/GBM/deep nets (lose at 396 events, Burk et al. 2026), stacked transfer (source shares the target's features), any recalibration (event-starved-origin fragility). Evidence: `docs/literature_rare_event_exploit_prediction.md` + `docs/research_pathways_2026-06.md`.
+- **Other ranked roadmap items (cited in `docs/research_pathways_2026-06.md`):** shared-frailty illness-death (the one *untried model* pathway with a structural reason to help — borrows PoC→in-wild via a shared frailty); XGBoost native `survival:cox` (`hist`, no O(n²)) on the *abundant* target; proper scoring rules (RCLL — our IPA basis ISBS is not strictly proper); decision-curve/net-benefit eval; sufficient-follow-up test to formally close cure.
+- **Reproduce anything:** `scripts/inwild_*.py` — `method_headtohead` (cox/rsf/gbm), `stacked_transfer`, `temperature`, `feature_prune`, `subcohort_drop`. Constraints still bind: ≤6–8 GB RAM / ≤7 GB VRAM, strict point-in-time/no-leakage.
 
 ## Recently landed (this initiative)
+- **Deep-research roadmap + flow-change prototypes (2026-06-19, session 2).** Acting on "find other methods/pathways/functions to change the flow and get better results; research the latest; ≥35 papers." Six parallel literature sweeps (**60+ papers, 2022–2026**) → `docs/research_pathways_2026-06.md`. Prototyped the two most feasible weak-spot-targeting flow-changes through the backtest — both **honest negative results** that confirm the data-limited ceiling:
+  - **Stacked transfer** (`augment_fn` hook + `scripts/inwild_stacked_transfer.py`): inject the abundant first-weaponization Cox's risk score as one in-wild covariate. **Δ everything ≈ 0** (AUC@90 −0.0004, IPA −0.0001 ≪ sd 0.069) — the source risk is a non-linear combination of features the in-wild Cox already has. The 396-event ceiling is also a transfer ceiling.
+  - **Temperature recalibration** (`calibration.py`, `temperature=True`): 1-param S^exp(a), out-of-sample cross-fit, **provably ranking-preserving** (AUC identical 0.8173=0.8173). **Harmful on the mean** (IPA@90 −0.003→−0.092) though median-neutral — event-starved origins learn a bad temperature (same rare-event fragility as the earlier isotonic attempt). Guarded with `min_events=40`; **recommendation: recalibration OFF for in-wild.**
+  - **Reverse-engineering (6 fixes):** crossfit_temperature never-abort fallback + min-events guard; clip consistency; `_merge_extra` non-numeric fail-loud; stratified source cap; non-cox temperature warning.
 - **In-wild method head-to-head + rare-event literature review (2026-06-19).** Acting on "don't fixate on one method — keep checking for a better one, and research how the field handles this." Ran the rolling-origin backtest (15 quarterly origins from 2022-01-01, KEV-catalog clock 2021-11-03, 71 EPSS features, **396 in-wild test events**) across the model classes the survival literature flags as the real challengers to a penalized Cox, prospectively (identical origins, only the model varies — `scripts/inwild_method_headtohead.py`):
 
   | model | AUC@90 (mean / median) | sd | recall@top-10% | IPA@90 | fit time |

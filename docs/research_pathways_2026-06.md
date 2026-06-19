@@ -177,9 +177,34 @@ revive it.
 | # | Pathway | Leverage | Effort | Status |
 |---|---|---|---|---|
 | 1 | **VulnCheck KEV (free) + Shadowserver** — 2–4× in-wild labels, earlier dates | **highest** (raises the ceiling) | low–med (fetch/token) | roadmap — the real fix |
-| 2 | **RCLL proper metric + temperature recalibration** — target IPA≈0 | high (the weak spot) | low | **prototyped now** |
-| 3 | **Stacked transfer** — first-weaponization risk as an in-wild covariate | med–high | low–med | **prototyped now** |
-| 4 | **Sufficient-follow-up test** — rigorously close the cure question | med (rigor) | low | **done now** |
+| 2 | **Temperature recalibration** — target IPA≈0 | high (the weak spot) | low | **prototyped — negative** ✗ |
+| 3 | **Stacked transfer** — first-weaponization risk as an in-wild covariate | med–high | low–med | **prototyped — negative** ✗ |
+| 4 | **Sufficient-follow-up test** — rigorously close the cure question | med (rigor) | low | roadmap |
+
+### Prototype results (2026-06-19) — both confirm the data-limited ceiling
+
+- **Stacked transfer** (`scripts/inwild_stacked_transfer.py`, via the new
+  `backtest.augment_fn` hook): inject the abundant first-weaponization Cox's
+  per-CVE risk score as one in-wild covariate, point-in-time per origin.
+  **Δ ≈ 0** (AUC@90 −0.0004, recall +0.0027, IPA −0.0001 — all ≪ sd 0.069). The
+  source risk is a non-linear combination of features the in-wild Cox *already*
+  has, so it carries no new information. Confirms the literature: the 396-event
+  ceiling is also a *transfer* ceiling. A richer transfer (shared-frailty over
+  the actual PoC **events**, not a feature — Pathway 2) is the remaining untried
+  variant.
+- **Temperature recalibration** (`calibration.py`, `temperature=True`): 1-param
+  S^exp(a), learned out-of-sample by k-fold cross-fitting, monotone in S so
+  **ranking is provably unchanged** (AUC@90 identical 0.8173 = 0.8173). But it
+  **worsened the mean IPA** (@90 −0.003 → −0.092) while leaving the **median
+  unchanged** — i.e. on event-starved origins the cross-fit learns a *harmful*
+  temperature from ~7 events. Same rare-event recalibration fragility the
+  isotonic attempt showed. Guarded with `min_events=40`; **recommendation:
+  recalibration OFF for in-wild.** RCLL (the proper-metric half of this pathway)
+  remains worth adding as a *reporting* change — it may show IPA≈0 is partly a
+  non-proper-metric artifact — but it does not change the model.
+
+**Net:** neither flow-change beats baseline penalized Cox; IPA≈0 is the
+data-limited reality. The achievable win is Pathway 1 (more label data).
 | 5 | Shared-frailty illness-death / penalized-Cox transfer (survtrans) | med–high | med (R/custom EM) | roadmap |
 | 6 | Time-dependent PU propensity reweight (SAR-PU, `e(x)=f(age)`) | med | low–med | roadmap |
 | 7 | XGBoost `survival:cox` (hist) on the abundant target; SurvivalPFN on rare | low–med | med | roadmap (bake-off) |
