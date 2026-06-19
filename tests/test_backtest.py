@@ -42,3 +42,19 @@ def test_backtest_permutation_is_chance_level():
     )
     # shuffled durations -> no learnable signal -> AUC ~ 0.5 (harness has no leak)
     assert abs(perm["aggregate"]["horizon_auc"]["90"]["mean"] - 0.5) < 0.08
+
+
+def test_backtest_clock_start_shrinks_training_set():
+    corpus, ev, features = _setup()
+    origins = make_origins("2024-06-01", start="2023-01-01", min_followup_days=180)
+    base = rolling_origin_backtest(corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,))
+    filt = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,),
+        clock_start="2022-06-01",
+    )
+    n_base = {o["origin"]: o["n_train"] for o in base["per_origin"]}
+    n_filt = {o["origin"]: o["n_train"] for o in filt["per_origin"]}
+    common = set(n_base) & set(n_filt)
+    assert common
+    assert all(n_filt[o] <= n_base[o] for o in common)
+    assert any(n_filt[o] < n_base[o] for o in common)  # pre-clock CVEs were dropped
