@@ -167,3 +167,31 @@ def test_fetch_stops_on_short_page(monkeypatch):
     frame = NvdConnector().fetch("2024-01-01T00:00:00", "2024-02-01T00:00:00")
     assert len(frame) == 1
     assert len(calls) == 2
+
+
+def test_fetch_json_retries_on_503(monkeypatch):
+    import io
+    import urllib.error
+
+    from temporal_exploit.fetch import nvd
+
+    calls = {"n": 0}
+
+    def fake_urlopen(request, timeout=None):
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise urllib.error.HTTPError(request.full_url, 503, "Service Unavailable", {}, None)
+
+        class _Resp:
+            def __enter__(self):
+                return io.BytesIO(b'{"ok": 1}')
+
+            def __exit__(self, *a):
+                return False
+
+        return _Resp()
+
+    monkeypatch.setattr(nvd.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(nvd.time, "sleep", lambda s: None)
+    assert nvd._fetch_json("http://x") == {"ok": 1}
+    assert calls["n"] == 3  # two 503s, then success
