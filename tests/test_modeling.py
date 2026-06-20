@@ -254,6 +254,24 @@ def test_transition_cindex_ranks_risk_and_guards_all_censored():
     assert transition_cindex(durations, risk, [False, False, False, False]) is None
 
 
+def test_prepare_modeling_frame_recovers_negative_duration_0days():
+    from temporal_exploit.modeling import prepare_modeling_frame
+
+    labels = pd.DataFrame({
+        "cve_id": ["A", "B", "C"],
+        "published": pd.to_datetime(["2023-01-01"] * 3, utc=True),
+        "duration_days": [10.0, -5.0, 20.0],  # B = a 0-day: exploited 5d before disclosure
+        "event_observed": [True, True, True],
+        "negative_duration_flag": [False, True, False],
+    })
+    features = pd.DataFrame({"cve_id": ["A", "B", "C"], "x": [1.0, 2.0, 3.0]})
+    default = prepare_modeling_frame(labels, features)
+    assert set(default["cve_id"]) == {"A", "C"}  # B dropped by default
+    rec = prepare_modeling_frame(labels, features, recover_negative_duration=True)
+    assert set(rec["cve_id"]) == {"A", "B", "C"}  # B recovered as a day-0 event
+    assert float(rec.loc[rec["cve_id"] == "B", "duration_days"].iloc[0]) == 0.5
+
+
 def test_evaluate_survival_rsf():
     labels, features = _synthetic(n=140)
     frame = prepare_modeling_frame(labels, features)
