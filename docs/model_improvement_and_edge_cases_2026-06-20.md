@@ -201,3 +201,23 @@ probabilities), TabPFN/SurvivalPFN today. All either lost prospectively here or 
 0.847→0.808 (~flat); AUC variance tighter (sd@180 0.060→0.040); recall@top-10%@90 0.509→0.540;
 IPA@90 median +0.0003→+0.0000 (neutral), mean −0.003→−0.083 (one outlier origin); median lead-time
 24d→203d. Paired IPA@90 delta −0.080, CI [−0.237, +0.076] (includes 0).
+
+---
+
+## Part E — Validity: eval power & in-wild non-stationarity (already answered)
+
+- **Eval power (is "no model beats Cox" a powered equivalence, or just undetectable?).** The
+  rolling-origin paired CIs answer this directly: the backtest **detects a +0.015 AUC@90 ranking
+  effect** (the floor fix, CI [+0.0012, +0.0281] excludes 0) but **cannot resolve IPA/calibration
+  effects below ~±0.15** (VulnCheck IPA@90 paired CI [−0.237, +0.076]). So "no model out-*ranks*
+  Cox by more than ~0.015 AUC" is a *powered* conclusion (stop chasing rankers); "no model improves
+  *calibration*" is **not** powered — the backtest is calibration-underpowered at ~1,200 events.
+  That is the honest reason the calibration frontier (A2/A4) stays open while the model-class
+  question is closed. `[MEASURED]`
+- **In-wild non-stationarity (the N5 validity gate) is visible in the per-origin IPA trajectory**
+  (`artifacts/vulncheck_diagnose.json`): IPA@90 swings from a +0.005 median to −1.17 at the 2022-04
+  origin (a real 98-event window) while AUC stays ~0.81 throughout — i.e. **calibration, not ranking,
+  is what drifts across eras.** This confirms B4 (an AUC-only era-stress harness would miss it) and
+  explains *why* the floor fix helps (a broader training era stabilizes the baseline hazard). A
+  dedicated single-split in-wild era-stress would be *more* event-starved than this per-origin view,
+  so it is the wrong instrument here. `[MEASURED]`
