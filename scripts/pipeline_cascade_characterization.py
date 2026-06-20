@@ -16,7 +16,11 @@ from temporal_exploit.evaluate import cascade_order_stats
 
 ART = Path("artifacts/merged")
 HZ = [7, 30, 90, 180]
-per_signal = pd.read_parquet(ART / "per_signal_labels.parquet")
+# only-required-info: cascade_order_stats + the bulk-index/by-year checks need just
+# published + {stage}_observed/_event_date for the four pipeline stages (9 of 30 cols).
+_PS_COLS = ["published"] + [f"{s}_{k}" for s in ("poc", "metasploit", "nuclei", "kev")
+                            for k in ("observed", "event_date")]
+per_signal = pd.read_parquet(ART / "per_signal_labels.parquet", columns=_PS_COLS)
 cr = pd.read_parquet(ART / "competing_risks_labels.parquet")
 feats = pd.read_parquet(ART / "publication_features.parquet")
 

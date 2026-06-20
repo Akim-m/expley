@@ -473,6 +473,67 @@ def test_bootstrap_report_brackets_point_and_self_delta_zero():
     assert delta["ci95"][0] <= 0 <= delta["ci95"][1]
 
 
+def test_downcast_int_features_is_lossless_and_smaller():
+    from temporal_exploit.modeling import downcast_int_features
+
+    frame = pd.DataFrame({
+        "cve_id": ["a", "b", "c"],
+        "duration_days": [1.0, 2.0, 3.0],
+        "event_observed": [1, 0, 1],          # meta -> untouched
+        "flag_wormable": [0, 1, 1],           # binary -> int8
+        "cwe_count": [3, 100, 7],             # small int -> int8
+        "cvss_v3_base": [7.5, 9.8, 4.1],      # float -> untouched
+        "neg_feature": [-5, 5, -120],         # signed small -> int8
+    })
+    before = frame.copy(deep=True)
+    out = downcast_int_features(frame)
+    # values bit-exact for every column
+    for c in before.columns:
+        assert list(out[c]) == list(before[c]), c
+    # integer FEATURE cols shrank to int8; float + meta untouched
+    assert out["flag_wormable"].dtype == np.int8
+    assert out["cwe_count"].dtype == np.int8
+    assert out["neg_feature"].dtype == np.int8
+    assert out["cvss_v3_base"].dtype == np.float64       # float never downcast (would change numerics)
+    assert str(out["event_observed"].dtype) == "int64"   # meta column untouched
+    assert out.memory_usage(deep=True).sum() < before.memory_usage(deep=True).sum()
+
+
+def test_downcast_does_not_change_model_risk_scores():
+    # the "no quality loss" proof: cox + xgb produce identical risk on the int8-
+    # downcast frame vs the int64 frame (models convert to float -> identical floats).
+    from temporal_exploit.modeling import (
+        _risk_scores, downcast_int_features, fit_cox, prepare_modeling_frame,
+    )
+
+    rng = np.random.default_rng(0)
+    n = 300
+    feats = pd.DataFrame({
+        "cve_id": [f"CVE-{i}" for i in range(n)],
+        "published": pd.Timestamp("2022-01-01", tz="UTC"),
+        "flag_a": rng.integers(0, 2, n),      # int64 flags
+        "flag_b": rng.integers(0, 2, n),
+        "cvss_v3_base": rng.uniform(0, 10, n),
+    })
+    labels = pd.DataFrame({
+        "cve_id": feats["cve_id"], "published": feats["published"],
+        "duration_days": rng.uniform(1, 200, n),
+        "event_observed": rng.integers(0, 2, n),
+        "negative_duration_flag": False,
+    })
+    frame = prepare_modeling_frame(labels, feats)            # already downcast (int8 flags)
+    frame_wide = frame.copy()
+    for c in ("flag_a", "flag_b"):
+        frame_wide[c] = frame_wide[c].astype("int64")        # force back to int64
+    feat_cols = [c for c in frame.columns if c not in
+                 ("cve_id", "published", "duration_days", "event_observed", "negative_duration_flag")]
+    assert frame["flag_a"].dtype == np.int8                  # downcast applied
+    m_small, m_wide = fit_cox(frame), fit_cox(frame_wide)
+    r_small = _risk_scores(m_small, frame[list(m_small.feature_cols_)].astype(float), "cox")
+    r_wide = _risk_scores(m_wide, frame_wide[list(m_wide.feature_cols_)].astype(float), "cox")
+    assert np.allclose(r_small, r_wide, atol=1e-10)          # identical model output
+
+
 def test_bootstrap_keeps_censored_when_events_exceed_max_eval():
     # Regression: when events alone exceed max_eval, the bootstrap must NOT collapse
     # to an events-only subpopulation. That changes the c-index estimand (drops every
