@@ -6,6 +6,12 @@ Runs three feature configs on identical origins -- full, no-EPSS, EPSS-only --
 with the GPU xgb-AFT model (gpu-only-models), in-wild labels, and reports paired
 per-origin deltas: full vs EPSS-only (must the model beat the baseline?) and full
 vs no-EPSS (the marginal EPSS lift). Loads only in-wild sources (no 188k-row poc).
+
+NOTE: epss_only here is the STATIC publication-time EPSS (epss_at_publication*), the
+FLOOR baseline -- NOT the landmark EPSS trajectory (velocity/max/rising), which the
+rolling backtest does not load. So "full beats EPSS-only" is necessary-but-not-
+sufficient evidence against trajectory-EPSS distillation; the strong control needs
+landmark + restart_clock plumbing in rolling_origin_backtest (tracked separately).
 """
 import json
 from pathlib import Path
@@ -45,13 +51,22 @@ for source, (parquet_name, date_col) in EVENT_SOURCES.items():
     if frame is not None:
         event_frames[source] = (frame, date_col)
 
+missing = [s for s in IN_WILD_SOURCES if s not in event_frames]
+print(f"in-wild sources loaded={sorted(event_frames)} missing={missing}", flush=True)
+
 features_full = pd.read_parquet(f"{ARTIFACT_DIR}/publication_features.parquet")
 epss_cols = epss_feature_columns(features_full.columns)
+# the EPSS-only baseline is the STATIC publication EPSS floor; assert no landmark
+# trajectory column sneaks in (that would silently make it a much stronger baseline).
+_STATIC_EPSS = {"epss_at_publication", "epss_percentile_at_publication", "epss_at_publication_missing"}
+assert set(epss_cols) <= _STATIC_EPSS, (
+    f"EPSS-only baseline expects only static publication EPSS; got {epss_cols}"
+)
 meta = [c for c in ("cve_id", "published") if c in features_full.columns]
 
 origins = make_origins(SNAPSHOT, START, min_followup_days=180)
-clock_start = in_wild_clock_start(tuple(s for s in event_frames if s in IN_WILD_SOURCES))
-print(f"model={MODEL} epss_columns={epss_cols} origins={len(origins)}", flush=True)
+clock_start = in_wild_clock_start(tuple(event_frames))  # keys are already the in-wild sources
+print(f"model={MODEL} static-EPSS-floor columns={epss_cols} origins={len(origins)}", flush=True)
 
 
 def _features_for(tag):
