@@ -2,7 +2,7 @@
 
 Living status + roadmap for the temporal-exploit modeling system. Update as work lands.
 
-Last updated: 2026-06-20.
+Last updated: 2026-06-21.
 
 ## ►► START HERE — handoff for the next agent
 
@@ -194,6 +194,23 @@ Executed the `2026-06-20-data-expansion-roadmap.md` + `2026-06-20-integrate-fetc
   **But static publication-time EPSS as a *feature* hurts:** full vs no-EPSS AUC@30 **−0.074 CI[−0.121, −0.027]**, AUC@90 **−0.067 CI[−0.101, −0.032]** (win 0.20–0.27; PR-AUC −0.008/−0.012, CI straddles 0). **The deployable config is the no-EPSS structural model** (CVSS/CWE/CPE/ATT&CK). The two results together are the point: the model's win over EPSS-only comes **entirely from non-EPSS structural signal, not from distilling EPSS** — sharpening, not overturning, the data-limited / cold-start-structural thesis. (Caveat: this is *static* pub-time EPSS; the landmark EPSS-trajectory + `restart_clock` arm is untested here — integration-plan Task 4 Step 2 remains open.)
 
   **Honest framing unchanged:** even at 4,690 events absolute PR-AUC stays ~0.02–0.03 (≈1–2% in-wild prevalence — the rare-event regime). The model **ranks** in-wild risk well (AUC 0.75–0.82) and clears the EPSS-only bar, but precision is prevalence-bounded. More labels raised the floor and tightened CIs; they did not change the regime.
+
+### 2026-06-21 — Landmark L=30 EPSS-trajectory + restart_clock arm (the STRONG circularity control — CORRECTS the F6 "distillation" verdict)
+
+Ran the one remaining leakage-safe EPSS arm: does the in-wild model still beat an EPSS-only baseline once that baseline is upgraded from the *static* publication reading (~0.50 AUC) to the **full landmark trajectory** (velocity/max/mean/std/rising + days-to-threshold)? `scripts/inwild_merged_landmark_eval.py` (merged build) + a current-code re-run of `scripts/inwild_epss_ablation_landmark.py` (handover build) — `rolling_origin_backtest(landmark_days=30)` applies `restart_clock` (cohort 4,690→**2,693** events; the ~2k fast in-wild events within 30d are conditioned out), GPU xgb, 15 origins, full / no_epss / epss_only on identical origins+cohort.
+
+- **Leak fixed first:** `days_to_epss_01/05` are EPSS-derived but escaped the `epss`-prefix filter and were sitting in the "no_epss" arm. Folded them into the EPSS baseline so no_epss is **truly EPSS-free** — required before any "structural carries it" claim.
+- **Verdict (identical on handover + merged → robust, NOT data-driven):**
+
+  | config | AUC@30 | AUC@90 | PR-AUC@90 |
+  |---|---|---|---|
+  | full (structural+EPSS) | 0.841 | 0.784 | 0.046 |
+  | **no_epss (pure structural)** | 0.808 | **0.824** | 0.028 |
+  | epss_only (complete EPSS: trajectory+timing) | 0.638 | 0.599 | 0.032 |
+
+  **On RANKING (AUC — the powered metric at ~1% prevalence): pure structural features BEAT the complete EPSS baseline by +0.171 (AUC@30) / +0.225 (AUC@90).** full vs complete-EPSS-only AUC@90 **+0.185 CI[0.112, 0.258]** win 0.93. Adding EPSS to structural does **not** improve ranking (full 0.784 ≤ no_epss 0.824). **On PRECISION (PR-AUC@90 ~0.03–0.05): the configs are statistically indistinguishable** (CIs span the effect) — PR-AUC is underpowered at this rarity; the `days_to_epss` timing features carry most of the small PR-AUC signal.
+
+- **This CORRECTS the prior F6 "largely distilling the EPSS trajectory" conclusion** (README + `docs/model_improvement_and_edge_cases_2026-06-20.md`). F6 judged on PR-AUC alone — where full ≈ EPSS-trajectory, but *uninformatively* (underpowered) — and never reported the decisive AUC gap. Re-running on **both** builds with current code gives the same answer, so it's a metric/measurement correction, not a data effect. **EPSS — even the full trajectory — is redundant given structural features for ranking in-wild risk; the deployable in-wild config should DROP EPSS** (no ranking help, adds mild noise). Consistent with the t=0 static result (no_epss best there too). Net across both regimes: the model's edge over EPSS is **structural CVE metadata, not EPSS distillation** — which strengthens the cold-start-structural thesis. **Methodological note:** at ~1% in-wild prevalence, **AUC is the powered metric for model separation; PR-AUC is the right deployment metric (absolute precision) but lacks power to compare configs** — report both, don't read a PR-AUC tie as evidence of equivalence.
 
 ## Conventions
 - TDD, one focused commit per change, two-stage review for non-trivial work.

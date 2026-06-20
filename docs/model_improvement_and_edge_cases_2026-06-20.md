@@ -277,6 +277,17 @@ the direction:
    **missing for ~48% of CVEs and near-chance (AUC 0.46–0.53)** for the rest. At L=30 (EPSS has a
    trajectory) the edge shrinks to +0.06–0.11 and **`no_epss ≥ full`** — the EPSS-saturated regime F6
    flagged. **Do NOT headline in-wild-at-landmark ranking; reviewers will find `no_epss ≥ full`.**
+
+   > **CORRECTION 2026-06-21** (`scripts/inwild_merged_landmark_eval.py`, leak-free ablation reproduced on
+   > handover + merged builds): the `no_epss ≥ full` observation here is **right and the reason matters**, but
+   > the "+0.06–0.11 edge" understated the gap — that earlier `epss_only` baseline (AUC ~0.72) sat *above*
+   > `landmark.py`'s documented trajectory ceiling (~0.63–0.68), i.e. it likely leaked structural signal. With
+   > a clean L=30 baseline (`epss_only` AUC@90 **0.599**, in range): **pure structural beats complete-EPSS by
+   > +0.225 AUC@90** (0.824 vs 0.599); full vs EPSS-only **+0.185 CI[0.112, 0.258]**. So the landmark-ranking
+   > story is *not* weak — it's **strong and structural**; what's true is that EPSS is redundant (`no_epss ≥
+   > full`), not that the model barely beats EPSS. The "F6 = distillation" framing is corrected: distillation
+   > was a PR-AUC-only read (underpowered at ~1% prevalence); on the powered metric (AUC) structure dominates.
+   > See `docs/progress.md` 2026-06-21.
 2. **At t=0, EPSS-at-publication HURTS — drop it from the cold-start head.** Median AUC30: `epss_only
    0.525 → full-with-EPSS 0.670 → no_epss 0.783`. EPSS-at-publication is a ~48%-missing near-random
    feature the booster overfits; it only helps once it has a *trajectory*. **Concrete recommendation:**

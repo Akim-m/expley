@@ -86,8 +86,12 @@ in-wild labels (it is metadata, not exploitation evidence).
       **Verdict: clears the PR-AUC-vs-EPSS-only bar** (PR-AUC@90 +0.0134 CI[0.001, 0.026]; AUC@90 +0.247)
       **but static pub-time EPSS as a feature hurts** (AUC@90 −0.067) — deployable config is **no-EPSS
       structural** (AUC@90 0.818). Win is non-EPSS structural signal, not EPSS distillation. *(2026-06-20)*
-- [ ] **Landmark EPSS-trajectory + `restart_clock` arm** (integration-plan Task 4 Step 2) — still untested;
-      the ablation above used *static* pub-time EPSS only. This is the one remaining leakage-safe EPSS arm.
+- [x] **Landmark EPSS-trajectory + `restart_clock` arm** (integration-plan Task 4 Step 2) — DONE (2026-06-21,
+      `scripts/inwild_merged_landmark_eval.py`). On ranking (AUC) pure structural features beat the complete
+      EPSS-trajectory baseline by **+0.225 AUC@90**; on precision (PR-AUC) the configs are indistinguishable
+      (underpowered). **Corrects the F6 "distillation" verdict** (it was PR-AUC-only; identical on handover +
+      merged → metric, not data). **EPSS is redundant given structural features for ranking — deployable
+      in-wild config drops EPSS.** See `docs/progress.md` 2026-06-21 entry.
 - [ ] **Make `recover_negative_duration=True` the default for the in-wild head** once a backtest confirms
       the calibration win holds out-of-sample (still off by default; full-wiring demo sets it explicitly).
 - [ ] **Decide on paid sources** — only if the EPSS-only bar is still not cleared *enough* after the free
