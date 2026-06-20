@@ -144,6 +144,44 @@ def test_landmark_restart_clock_already_prevents_window_leak():
     assert _ntrain_by_origin(no_embargo) == _ntrain_by_origin(with_embargo)
 
 
+def test_publication_only_view_drops_landmark_features():
+    from temporal_exploit.backtest import _publication_only_features
+
+    df = pd.DataFrame(
+        {
+            "cve_id": [1], "cvss_v3_base": [7.5], "incentive_wormable": [1],
+            "epss_at_publication": [0.1], "epss_velocity_to_landmark": [0.5],
+            "poc_by_landmark": [1], "days_to_epss_01": [3], "poc_lag_days": [2.0],
+        }
+    )
+    out = _publication_only_features(df)
+    assert {"cve_id", "cvss_v3_base", "incentive_wormable", "epss_at_publication"} <= set(out.columns)
+    for c in ("epss_velocity_to_landmark", "poc_by_landmark", "days_to_epss_01", "poc_lag_days"):
+        assert c not in out.columns  # post-publication / landmark cols stripped
+
+
+def test_instant_head_is_registered():
+    from temporal_exploit.backtest import LABEL_BUILDERS
+    from temporal_exploit.labels import build_in_wild_labels
+
+    # the t=0 operating point is a first-class head (in-wild labels, publication-only view)
+    assert LABEL_BUILDERS.get("instant") is build_in_wild_labels
+
+
+def test_publication_only_view_runs_in_backtest():
+    # the publication-only view runs end-to-end and strips an injected landmark col
+    # without breaking the backtest (fixture is poc-based -> first_weaponization).
+    corpus, ev, features = _setup()
+    features = features.copy()
+    features["epss_velocity_to_landmark"] = 0.5  # landmark col the view must strip
+    origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
+    res = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,),
+        feature_view="publication_only",
+    )
+    assert res["aggregate"]["n_origins"] >= 1
+
+
 @pytest.mark.parametrize("model", ["rsf", "gbm"])
 def test_backtest_runs_nonlinear_models(model):
     # the non-linear ensemble methods (RSF, gradient-boosted survival) must ride
