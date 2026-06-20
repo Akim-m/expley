@@ -2,7 +2,7 @@
 
 Living status + roadmap for the temporal-exploit modeling system. Update as work lands.
 
-Last updated: 2026-06-19.
+Last updated: 2026-06-20.
 
 ## ►► START HERE — handoff for the next agent
 
@@ -180,6 +180,20 @@ Per scope guidance (2026-06-12): stay within the README's defined sources. New e
   - **N5** (`340af87`,`e146816`,`d221fa7`) — `era_stress_eval` + `scripts/era_stress.py` (the P0 validity gate): train-old/test-new vs an in-period control (both trains as-of `train_max`, de-confounded per the audit) on first_weaponization@90. **Result is era-dependent, not a clean degradation:** train≤2022/test≥2024 = **−0.031** (cross-era AUC 0.555 vs in-period 0.587, n=34,921; the pre-fix −0.073 was ~half snapshot-censoring confound) but train≤2023/test≥2025 = **+0.074** (cross 0.615 > in-period 0.541) — the opposite sign. A **residual confound remains** (the in-period TEST has less follow-up than the cross-era test, so at the 90d horizon it is scored on an earlier within-window slice). **Honest verdict: on this signal-starved publication-only head (AUC 0.54–0.62) era-stress is directional/inconclusive — the "745d→44d" median-time collapse does NOT manifest as a clear, consistent ranking-AUC degradation.** A cleaner measurement needs follow-up-matched test windows (next-agent item).
   - **N6** (`bd99518`,`04cd587`,`d221fa7`) — `build_transition_labels` + `transition_cindex` + the registered `poc_to_exploitdb` head + `scripts/transition_poc_to_exploitdb.py` (verified_only filter, 24.7k verified rows). **Verdict: the PoC→verified-ExploitDB forward transition is near-empty (68 events / 162,730 PoC'd CVEs, 0.04%)** because **99.4% of verified-ExploitDB entries PRECEDE the aggregated PoC date** (ExploitDB is itself an early PoC source; only 0.5%/71 are genuine escalations). When it happens it is fast (median 31–49d) and ranks above chance pooled (AUC@90 ~0.74 / 46 test events) but PR-AUC ~0.007 at the 0.04% base rate, and a clean held-out split has just 2 events. **ExploitDB-verified is label enrichment, not a downstream target.** Transition machinery is reusable for PoC→Metasploit / PoC→KEV.
   - **Reverse-engineering audit** (`d221fa7`) — 5-agent adversarial review of N4–N6 (13 findings: 0 critical / 6 high). Fixed: `transition_cindex` rename (collision with `competing.cause_specific_cindex`) + all-censored guard; the era-stress in-period confound (now both trains as-of `train_max`); competing-source validation + label-based indexing in `build_transition_labels`; script double-loads (ExploitDB, corpus); explicit held-out transition c-index. **Known/deferred:** `rolling_origin_backtest` never extracts the per-origin IPCW c-index into the aggregate (pre-existing, affects all heads).
+
+### 2026-06-20 — Data-expansion integration (VulnCheck + NVD++ merged → rebuilt → re-evaluated)
+
+Executed the `2026-06-20-data-expansion-roadmap.md` + `2026-06-20-integrate-fetched-data.md` plans end-to-end on the staged live data (no re-fetch needed):
+
+- **Merge** (`data/merged/`, `merge_manifest.json`) — folded the live deltas onto the handover: corpus **338,015 → 359,507** unique (NVD++ added ~21k CVEs), KEV 1,542→1,623, Google 0-day 344→404, plus `merge_live_only` sources VulnCheck KEV (4,969) / ExploitDB (30,323) / EPSS-history. No dup `cve_id`.
+- **Rebuild** (`artifacts/merged/`, snapshot 2026-03-14, landmarks 7/30) — peak RSS **1.49 GB**, 2m35s (streamed EPSS path held; ~3 GB abort threshold never approached). **In-wild events 454 → 4,690** (>10×); first-weaponization 170,951 / 359,507; all 9 EPSS-landmark dynamics columns present, **0 NaN**.
+- **Re-evaluate** (`scripts/inwild_merged_eval.py` → `artifacts/merged/inwild_epss_ablation.json`) — GPU xgb-AFT, 15 rolling origins (2022-01 … 2025-07), expanded in-wild labels, three feature configs on identical origins.
+
+  **The PR-AUC-vs-EPSS-only bar is CLEARED on the expanded labels:** full vs static-EPSS-only PR-AUC@30 **+0.0089 CI[0.004, 0.014]** (win 0.93), PR-AUC@90 **+0.0134 CI[0.001, 0.026]** (win 0.93) — both CIs exclude 0. Ranking is dominant: AUC@30 **+0.233** (win 0.87), AUC@90 **+0.247** (win 1.00). Absolute: EPSS-only AUC@90 **0.505** (static pub-EPSS ≈ coin-flip on ranking) vs full **0.752** vs no-EPSS **0.818**.
+
+  **But static publication-time EPSS as a *feature* hurts:** full vs no-EPSS AUC@30 **−0.074 CI[−0.121, −0.027]**, AUC@90 **−0.067 CI[−0.101, −0.032]** (win 0.20–0.27; PR-AUC −0.008/−0.012, CI straddles 0). **The deployable config is the no-EPSS structural model** (CVSS/CWE/CPE/ATT&CK). The two results together are the point: the model's win over EPSS-only comes **entirely from non-EPSS structural signal, not from distilling EPSS** — sharpening, not overturning, the data-limited / cold-start-structural thesis. (Caveat: this is *static* pub-time EPSS; the landmark EPSS-trajectory + `restart_clock` arm is untested here — integration-plan Task 4 Step 2 remains open.)
+
+  **Honest framing unchanged:** even at 4,690 events absolute PR-AUC stays ~0.02–0.03 (≈1–2% in-wild prevalence — the rare-event regime). The model **ranks** in-wild risk well (AUC 0.75–0.82) and clears the EPSS-only bar, but precision is prevalence-bounded. More labels raised the floor and tightened CIs; they did not change the regime.
 
 ## Conventions
 - TDD, one focused commit per change, two-stage review for non-trivial work.

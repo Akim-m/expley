@@ -79,17 +79,20 @@ in-wild labels (it is metadata, not exploitation evidence).
 
 ## Next steps (open work — execute via the companion plan)
 
-- [ ] **Refresh NVD++ into the corpus** — run `refresh --with-nvdplus` (needs `VULNCHECK_API_TOKEN`),
-      then the companion plan's **Task 2 (merge)** folds it + VulnCheck KEV into `data/merged/`.
-- [ ] **Rebuild + re-evaluate** — companion plan **Tasks 3–4**: build from `data/merged/`, then the
-      in-wild rolling-origin backtest with `paired_origin_deltas` and the **PR-AUC-vs-EPSS-only** bar
-      at 30/90d, plus the GPU xgb-AFT re-test at the new event count.
-- [ ] **Make `recover_negative_duration=True` the default for the in-wild head** once the backtest
-      confirms the calibration win holds out-of-sample (it is off by default today; the full-wiring
-      demo turns it on explicitly). Gate the flip on the companion plan's Task 4 verdict.
-- [ ] **Decide on paid sources** — only if the EPSS-only bar is still not cleared after the free
-      expansion. GreyNoise bulk tags or the VulnCheck paid tier are the candidates; document the
-      cost/benefit before any spend. No action until the free path is fully measured.
+- [x] **NVD++ + VulnCheck staged + merged** — live data was already fetched (`data/live/`); merged onto
+      the handover into `data/merged/` (corpus 338k→**359,507**, in-wild events 454→**4,690**). *(2026-06-20)*
+- [x] **Rebuild + re-evaluate** — built `artifacts/merged/` (landmarks 7/30, peak RSS 1.49 GB) and ran the
+      GPU xgb in-wild EPSS-ablation over 15 rolling origins (`scripts/inwild_merged_eval.py`).
+      **Verdict: clears the PR-AUC-vs-EPSS-only bar** (PR-AUC@90 +0.0134 CI[0.001, 0.026]; AUC@90 +0.247)
+      **but static pub-time EPSS as a feature hurts** (AUC@90 −0.067) — deployable config is **no-EPSS
+      structural** (AUC@90 0.818). Win is non-EPSS structural signal, not EPSS distillation. *(2026-06-20)*
+- [ ] **Landmark EPSS-trajectory + `restart_clock` arm** (integration-plan Task 4 Step 2) — still untested;
+      the ablation above used *static* pub-time EPSS only. This is the one remaining leakage-safe EPSS arm.
+- [ ] **Make `recover_negative_duration=True` the default for the in-wild head** once a backtest confirms
+      the calibration win holds out-of-sample (still off by default; full-wiring demo sets it explicitly).
+- [ ] **Decide on paid sources** — only if the EPSS-only bar is still not cleared *enough* after the free
+      expansion. The bar IS cleared on ranking, but absolute PR-AUC stays ~0.02–0.03 (prevalence-bounded);
+      GreyNoise bulk tags / VulnCheck paid tier are the candidates. Document cost/benefit before any spend.
 
 ## Constraints (carried from the companion plan — non-negotiable)
 
