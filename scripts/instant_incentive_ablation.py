@@ -25,7 +25,10 @@ from temporal_exploit.cli import (
     load_optional_event,
 )
 from temporal_exploit.epss_features import epss_feature_columns
-from temporal_exploit.incentive_features import incentive_feature_columns
+from temporal_exploit.incentive_features import (
+    build_incentive_features,
+    incentive_feature_columns,
+)
 from temporal_exploit.loaders import load_parquet
 
 OUT_DIR = Path("dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out")
@@ -47,6 +50,11 @@ for source, (parquet_name, date_col) in EVENT_SOURCES.items():
 print(f"sources loaded={sorted(event_frames)}", flush=True)
 
 features_full = pd.read_parquet(f"{ARTIFACT_DIR}/publication_features.parquet")
+# the prebuilt matrix predates the incentive features (commit 4c66a11) -> build + merge now
+if not incentive_feature_columns(features_full.columns):
+    corpus_inc = load_parquet(OUT_DIR, "cve_corpus", columns=["cve_id", "cvss_v3_vector"])
+    features_full = features_full.merge(build_incentive_features(corpus_inc), on="cve_id", how="left")
+    del corpus_inc
 epss_cols = epss_feature_columns(features_full.columns)
 incentive_cols = incentive_feature_columns(features_full.columns)
 meta = [c for c in ("cve_id", "published") if c in features_full.columns]
