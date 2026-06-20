@@ -210,6 +210,42 @@ def test_build_epss_at_landmark_takes_last_reading_in_window(tmp_path):
     assert out.loc["CVE-2024-0002", "epss_rising_to_landmark"] == 0
 
 
+def test_build_epss_at_landmark_trajectory_stats(tmp_path):
+    # full daily window is already streamed: mean/std/count + days-to-threshold are
+    # free incremental accumulators (no extra scan), all landmark-safe.
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0002"],
+            "published": pd.to_datetime(["2024-01-01", "2024-06-01"], utc=True),
+        }
+    )
+    history = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001"] * 3,
+            "date": pd.to_datetime(["2024-01-01", "2024-01-05", "2024-01-20"], utc=True),
+            "epss": [0.1, 0.4, 0.9],  # in-window (L=7): 0.1@day0, 0.4@day4; 0.9@day19 is out
+            "percentile": [0.5, 0.7, 0.99],
+        }
+    )
+    path = tmp_path / "epss.parquet"
+    history.to_parquet(path)
+    out = build_epss_at_landmark(corpus, str(path), landmark_days=7).set_index("cve_id")
+
+    r = out.loc["CVE-2024-0001"]
+    assert r["epss_reading_count_to_landmark"] == 2
+    assert r["epss_mean_to_landmark"] == pytest.approx(0.25)  # (0.1+0.4)/2
+    assert r["epss_std_to_landmark"] == pytest.approx(0.15)  # population std of [0.1,0.4]
+    assert r["days_to_epss_01"] == pytest.approx(0.0)  # 0.1 >= 0.1 at day 0
+    assert r["days_to_epss_05"] == pytest.approx(8.0)  # none >= 0.5 in window -> L+1
+
+    # no in-window reading -> stats zero, threshold days = L+1
+    m = out.loc["CVE-2024-0002"]
+    assert m["epss_reading_count_to_landmark"] == 0
+    assert m["epss_mean_to_landmark"] == 0.0
+    assert m["epss_std_to_landmark"] == 0.0
+    assert m["days_to_epss_01"] == pytest.approx(8.0)
+
+
 def test_provenance_rows_cover_every_feature_family():
     prov = landmark_feature_provenance(landmark_days=30)
     assert (prov["leakage_status"] == "landmark_safe").all()
