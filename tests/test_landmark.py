@@ -246,6 +246,49 @@ def test_build_epss_at_landmark_trajectory_stats(tmp_path):
     assert m["days_to_epss_01"] == pytest.approx(8.0)
 
 
+def test_build_epss_features_equals_separate_calls(tmp_path):
+    # the fused single-pass builder must be byte-identical to publication + each
+    # landmark computed separately -- including the pre-EPSS-coverage trap (CVE-A
+    # published 2020 keeps its real 2021 publication reading while its landmark
+    # window is empty; a wrong fusion would zero it).
+    from temporal_exploit.epss_features import build_epss_at_publication
+    from temporal_exploit.landmark import build_epss_features
+
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-A", "CVE-B"],
+            "published": pd.to_datetime(["2020-06-01", "2024-01-01"], utc=True),
+        }
+    )
+    history = pd.DataFrame(
+        {
+            "cve_id": ["CVE-A", "CVE-A", "CVE-B", "CVE-B", "CVE-B"],
+            "date": pd.to_datetime(
+                ["2021-05-01", "2021-06-01", "2024-01-01", "2024-01-05", "2024-01-20"], utc=True
+            ),
+            "epss": [0.2, 0.3, 0.1, 0.4, 0.9],
+            "percentile": [0.5, 0.6, 0.5, 0.7, 0.99],
+        }
+    )
+    path = str(tmp_path / "epss.parquet")
+    history.to_parquet(path)
+    snap, landmarks = "2026-03-14", (7, 30)
+
+    fused = build_epss_features(corpus, path, landmarks=landmarks, snapshot_date=snap)
+    pd.testing.assert_frame_equal(
+        fused["publication"].reset_index(drop=True),
+        build_epss_at_publication(corpus, path, snapshot_date=snap).reset_index(drop=True),
+    )
+    for L in landmarks:
+        pd.testing.assert_frame_equal(
+            fused[L].reset_index(drop=True),
+            build_epss_at_landmark(corpus, path, L, snapshot_date=snap).reset_index(drop=True),
+        )
+    # the trap: A keeps its real publication EPSS while its landmark window is empty
+    assert fused["publication"].set_index("cve_id").loc["CVE-A", "epss_at_publication"] == 0.2
+    assert fused[7].set_index("cve_id").loc["CVE-A", "epss_at_landmark_missing"] == 1
+
+
 def test_provenance_rows_cover_every_feature_family():
     prov = landmark_feature_provenance(landmark_days=30)
     assert (prov["leakage_status"] == "landmark_safe").all()
