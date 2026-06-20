@@ -473,6 +473,29 @@ def test_bootstrap_report_brackets_point_and_self_delta_zero():
     assert delta["ci95"][0] <= 0 <= delta["ci95"][1]
 
 
+def test_bootstrap_keeps_censored_when_events_exceed_max_eval():
+    # Regression: when events alone exceed max_eval, the bootstrap must NOT collapse
+    # to an events-only subpopulation. That changes the c-index estimand (drops every
+    # event-vs-censored pair) and yields a CI that does not bracket the reported
+    # full-set point estimate -- exactly the failure seen on the 45k-event
+    # first-weaponization head (ipcw/truncated 0.61 but bootstrap ci ~0.51).
+    from temporal_exploit.modeling import bootstrap_cindex_report
+
+    rng = np.random.default_rng(0)
+    n_ev, n_cn = 60, 60
+    # events: constant high risk + early; censored: low risk + late. The FULL c-index
+    # is ~1.0 (events rank above censored), but the events-only c-index is ~0.5
+    # (constant event risk -> all event-vs-event pairs tie).
+    dur = np.concatenate([rng.uniform(1, 30, n_ev), rng.uniform(31, 60, n_cn)])
+    ev = np.array([True] * n_ev + [False] * n_cn)
+    risk = np.concatenate([np.full(n_ev, 5.0), np.zeros(n_cn)])
+
+    report = bootstrap_cindex_report(dur, ev, {"m": risk}, tau=100.0, n_boot=50, max_eval=40)
+    lo, hi = report["per_model"]["m"]["ci95"]
+    # events (60) > max_eval (40): the buggy events-only path collapses ci to ~0.5
+    assert lo > 0.8, f"bootstrap collapsed to events-only subpopulation: ci={[lo, hi]}"
+
+
 def test_truncated_cindex_matches_harrell_on_uncensored():
     from lifelines.utils import concordance_index
     from temporal_exploit.modeling import truncated_cindex
