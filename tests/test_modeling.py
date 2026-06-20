@@ -243,6 +243,15 @@ def test_evaluate_survival_supports_short_horizons():
     assert fracs == sorted(fracs)  # monotone non-decreasing in horizon
 
 
+def test_cause_specific_cindex_ranks_risk():
+    from temporal_exploit.modeling import cause_specific_cindex
+
+    durations = [10.0, 20.0, 30.0, 40.0]
+    events = [True, True, True, False]  # last is a competing event / censored
+    risk = [4.0, 3.0, 2.0, 1.0]  # higher risk -> earlier transition (perfect concordance)
+    assert cause_specific_cindex(durations, risk, events) > 0.9
+
+
 def test_evaluate_survival_rsf():
     labels, features = _synthetic(n=140)
     frame = prepare_modeling_frame(labels, features)

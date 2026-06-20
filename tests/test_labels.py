@@ -7,10 +7,53 @@ from temporal_exploit.labels import (
     build_first_weaponization_labels,
     build_in_wild_labels,
     build_per_signal_labels,
+    build_transition_labels,
     first_event_per_cve,
 )
 
 from tests.fixtures.tiny_parquets import write_tiny_handover
+
+
+def _utc(dates):
+    return pd.to_datetime(dates, utc=True)
+
+
+def test_build_transition_labels_poc_to_exploitdb():
+    # cohort = CVEs that reached PoC; clock = PoC -> ExploitDB-verified
+    corpus = pd.DataFrame({"cve_id": ["A", "B", "C", "D"], "published": _utc(["2023-01-01"] * 4)})
+    poc = pd.DataFrame({"cve_id": ["A", "B", "C"], "poc_first_seen": _utc(["2023-01-01"] * 3)})
+    exploitdb = pd.DataFrame(
+        {
+            "cve_id": ["A", "B", "D"],
+            # A: 10d after PoC (transition); B: before PoC (not forward); D: no PoC (excluded)
+            "exploitdb_date_published": _utc(["2023-01-11", "2022-12-20", "2023-02-01"]),
+        }
+    )
+    ef = {"poc": (poc, "poc_first_seen"), "exploitdb": (exploitdb, "exploitdb_date_published")}
+    out = build_transition_labels(corpus, ef, "2023-06-01", "poc", "exploitdb").set_index("cve_id")
+    assert set(out.index) == {"A", "B", "C"}  # D has no PoC -> excluded from the cohort
+    assert bool(out.loc["A", "event_observed"]) and out.loc["A", "event_source"] == "exploitdb"
+    assert out.loc["A", "duration_days"] == 10
+    assert not bool(out.loc["B", "event_observed"])  # exploit predates PoC -> censored
+    assert not bool(out.loc["C", "event_observed"])  # never reached exploit -> censored
+
+
+def test_build_transition_labels_competing_censors():
+    corpus = pd.DataFrame({"cve_id": ["A"], "published": _utc(["2023-01-01"])})
+    poc = pd.DataFrame({"cve_id": ["A"], "poc_first_seen": _utc(["2023-01-01"])})
+    exploitdb = pd.DataFrame({"cve_id": ["A"], "exploitdb_date_published": _utc(["2023-01-11"])})
+    kev = pd.DataFrame({"cve_id": ["A"], "kev_date_added": _utc(["2023-01-06"])})
+    ef = {
+        "poc": (poc, "poc_first_seen"),
+        "exploitdb": (exploitdb, "exploitdb_date_published"),
+        "kev": (kev, "kev_date_added"),
+    }
+    out = build_transition_labels(
+        corpus, ef, "2023-06-01", "poc", "exploitdb", competing_sources=("kev",)
+    )
+    # KEV (day 5) precedes ExploitDB (day 10) -> cause-specific censoring at day 5, NOT an event
+    assert not bool(out.iloc[0]["event_observed"])
+    assert out.iloc[0]["duration_days"] == 5
 
 
 def test_vulncheck_is_in_wild_exploitdb_is_not() -> None:
