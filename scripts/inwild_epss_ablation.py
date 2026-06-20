@@ -27,6 +27,7 @@ from temporal_exploit.epss_features import epss_feature_columns
 from temporal_exploit.loaders import load_parquet
 
 OUT_DIR = Path("dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out")
+LIVE_DIR = Path("data/live")  # has VulnCheck-KEV (4969) -> the expanded in-wild labels
 ARTIFACT_DIR = "artifacts/bt_epss"
 SNAPSHOT, START, HORIZONS = "2026-03-14", "2022-01-01", (7, 30, 90, 180)
 MODEL = "xgb"  # GPU AFT (gpu-only-models)
@@ -36,30 +37,41 @@ event_frames = {}
 for source, (parquet_name, date_col) in EVENT_SOURCES.items():
     if source not in IN_WILD_SOURCES:  # in-wild only: skip poc(188k)/tooling loads
         continue
-    frame = load_optional_event(OUT_DIR, parquet_name, date_col)
+    # in-wild sources from data/live so VulnCheck-KEV is included (the handover
+    # out/ predates it: 454 -> 1368 eligible events); fall back to handover.
+    frame = load_optional_event(LIVE_DIR, parquet_name, date_col)
+    if frame is None:
+        frame = load_optional_event(OUT_DIR, parquet_name, date_col)
     if frame is not None:
         event_frames[source] = (frame, date_col)
 
 features_full = pd.read_parquet(f"{ARTIFACT_DIR}/publication_features.parquet")
 epss_cols = epss_feature_columns(features_full.columns)
 meta = [c for c in ("cve_id", "published") if c in features_full.columns]
-configs = {
-    "full": features_full,
-    "no_epss": features_full.drop(columns=epss_cols),
-    "epss_only": features_full[meta + epss_cols],
-}
 
 origins = make_origins(SNAPSHOT, START, min_followup_days=180)
 clock_start = in_wild_clock_start(tuple(s for s in event_frames if s in IN_WILD_SOURCES))
 print(f"model={MODEL} epss_columns={epss_cols} origins={len(origins)}", flush=True)
 
-res = {
-    tag: rolling_origin_backtest(
+
+def _features_for(tag):
+    # built just-in-time so we never hold more than one derived ~198 MB copy at once
+    if tag == "no_epss":
+        return features_full.drop(columns=epss_cols)
+    if tag == "epss_only":
+        return features_full[meta + epss_cols]
+    return features_full  # "full" reuses the base frame -- no copy
+
+
+res = {}
+for tag in ("full", "no_epss", "epss_only"):
+    feats = _features_for(tag)
+    res[tag] = rolling_origin_backtest(
         corpus, event_frames, feats, SNAPSHOT, origins, model=MODEL,
         label_set="in_wild", horizons=HORIZONS, clock_start=clock_start,
     )
-    for tag, feats in configs.items()
-}
+    if feats is not features_full:
+        del feats  # free the derived copy before building the next config
 
 out = {
     "model": MODEL,
