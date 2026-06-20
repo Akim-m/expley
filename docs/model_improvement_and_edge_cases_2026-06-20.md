@@ -116,7 +116,19 @@ VulnCheck broadened the population) and the literature converge here. **Booth, R
 1-parameter-ish, ≤6 GB, ~1200 events fine. Pairs with **recalibration-in-the-large**
 (intercept/slope, van Houwelingen 2000) and **D-calibration monitoring** (Ghawami 2026).
 Implement as a new `temporal_recalibration.py` applied to the Cox baseline (lifelines uses a
-Breslow baseline → recompute it on recent rows). `[VERIFY×3]`
+Breslow baseline → recompute it on recent rows).
+
+**IMPLEMENTED + MEASURED — honest NEGATIVE (`temporal_recalibration.py`, `scripts/inwild_temporal_recal.py`).**
+The module is correct (RE-verified: Breslow matches lifelines to 3e-16; rank-preservation confirmed —
+AUC@90 identical at all 15 origins) but on the in-wild backtest it is **neutral-to-slightly-negative**:
+median IPA@90 0.0050→0.0039, mean 0.0011→0.0003. **Why: the floor fix (A1) already subsumed it.** With
+the no-floor default the base IPA is already positive at nearly every origin — the 2022-04 collapse went
+from −1.17 *with* the floor to **+0.009 without it** (the floor fix alone fixed the worst origin) — so
+there's little staleness bias left to remove, and recalibrating on the smaller recent window only adds
+baseline variance. Temporal recalibration trades bias for variance; the floor fix already removed the
+bias. **Verdict: keep the module (correct, available for a regime where the training era *can't* be
+broadened), but do NOT wire it on — the floor fix is the better fix here.** A clean example of two fixes
+for one symptom being substitutes, with the cheaper one winning. `[MEASURED — negative]`
 
 ### A3. Name and correct the VulnCheck symptom as **label shift** `[LIT]`
 
