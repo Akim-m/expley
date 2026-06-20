@@ -1,5 +1,6 @@
 import pandas as pd
 import pyarrow.parquet as pq
+import pytest
 
 from temporal_exploit.epss_features import (
     _epss_row_groups,
@@ -22,6 +23,20 @@ def test_epss_feature_columns_selects_epss_prefixed():
         "epss_at_publication_missing", "epss_at_landmark",
     ]
     assert epss_feature_columns(["cve_id", "cvss_v3_base"]) == []
+
+
+def test_build_epss_at_publication_rejects_duplicate_cve_ids(tmp_path):
+    # a duplicate cve_id would make get_indexer raise a cryptic error mid-scan;
+    # fail loud and early with a useful message instead.
+    epss_path = _write_epss(tmp_path)
+    corpus = pd.DataFrame(
+        {
+            "cve_id": ["CVE-2024-0001", "CVE-2024-0001"],
+            "published": pd.to_datetime(["2024-01-01", "2024-01-01"], utc=True),
+        }
+    )
+    with pytest.raises(ValueError, match="duplicate"):
+        build_epss_at_publication(corpus, epss_path)
 from tests.fixtures.tiny_parquets import write_epss_row_groups
 
 
