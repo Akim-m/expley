@@ -216,6 +216,19 @@ def test_evaluate_survival_reports_horizon_pr_auc():
         assert 0.0 <= v <= 1.0
 
 
+def test_evaluate_survival_reports_ipcw_auc_t():
+    # IPCW time-dependent AUC(t) cross-check: the key is always present (possibly
+    # empty if sksurv can't compute it on the support); any value is a valid AUC.
+    labels, features = _synthetic(n=140)
+    frame = prepare_modeling_frame(labels, features)
+    train, test = time_split_frame(frame, "2023-09-01")
+    model = fit_cox(train)
+    res = evaluate_survival(model, train, test, horizons=(30, 90))
+    assert "auc_t_ipcw" in res
+    for v in res["auc_t_ipcw"].values():
+        assert 0.0 <= v <= 1.0
+
+
 def test_evaluate_survival_rsf():
     labels, features = _synthetic(n=140)
     frame = prepare_modeling_frame(labels, features)
