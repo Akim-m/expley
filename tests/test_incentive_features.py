@@ -2,8 +2,18 @@ import pandas as pd
 
 from temporal_exploit.incentive_features import (
     build_incentive_features,
+    incentive_feature_columns,
     incentive_feature_provenance,
 )
+
+
+def test_incentive_feature_columns_selects_incentive_prefixed():
+    cols = [
+        "cve_id", "cvss_v3_base", "incentive_wormable",
+        "incentive_high_impact", "epss_at_publication",
+    ]
+    assert incentive_feature_columns(cols) == ["incentive_wormable", "incentive_high_impact"]
+    assert incentive_feature_columns(["cve_id", "cvss_v3_base"]) == []
 
 
 def test_build_incentive_features():

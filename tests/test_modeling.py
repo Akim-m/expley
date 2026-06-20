@@ -229,6 +229,20 @@ def test_evaluate_survival_reports_ipcw_auc_t():
         assert 0.0 <= v <= 1.0
 
 
+def test_evaluate_survival_supports_short_horizons():
+    # the instant / short-horizon head uses 1/3/7d; evaluate_survival must handle them,
+    # and the subcohort drop-fraction is non-decreasing in horizon (longer h censors more).
+    labels, features = _synthetic(n=200)
+    frame = prepare_modeling_frame(labels, features)
+    train, test = time_split_frame(frame, "2023-09-01")
+    model = fit_cox(train)
+    res = evaluate_survival(model, train, test, horizons=(1, 7, 30, 90))
+    supp = res["horizon_auc_support"]
+    assert supp  # at least one horizon within the test follow-up support
+    fracs = [supp[str(h)]["dropped_frac"] for h in sorted(int(h) for h in supp)]
+    assert fracs == sorted(fracs)  # monotone non-decreasing in horizon
+
+
 def test_evaluate_survival_rsf():
     labels, features = _synthetic(n=140)
     frame = prepare_modeling_frame(labels, features)
