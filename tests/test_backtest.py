@@ -87,6 +87,24 @@ def test_backtest_recovers_signal_across_origins():
     assert 0.0 <= agg["horizon_auc_dropped_frac"]["90"] <= 1.0
 
 
+def test_backtest_landmark_days_restarts_clock():
+    # landmark_days shifts the prediction clock to published+L and drops events at/
+    # before the landmark (restart_clock), enabling landmark-regime backtests where
+    # the landmark trajectory features are leakage-safe.
+    corpus, ev, features = _setup()
+    origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
+    base = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(30, 90, 180)
+    )
+    lm = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(30, 90, 180),
+        landmark_days=30,
+    )
+    assert lm["aggregate"]["n_origins"] >= 1
+    # events at/before the landmark are dropped -> no more test events than baseline
+    assert lm["aggregate"]["test_events_total"] <= base["aggregate"]["test_events_total"]
+
+
 @pytest.mark.parametrize("model", ["rsf", "gbm"])
 def test_backtest_runs_nonlinear_models(model):
     # the non-linear ensemble methods (RSF, gradient-boosted survival) must ride
