@@ -98,9 +98,14 @@ being the driver). **Caveat:** recovered CISA-backfilled events have artifactual
 (catalog-add), so trust the ranking gain over the timing; the VulnCheck-only arm (clean
 first-evidence dates) giving the same result is what makes it robust. Single run, cox, EPSS-only
 features — confirm with the incentive features + a second model before shipping.
-**Recommended change (hand-off, do not edit cli.py while the concurrent agent owns it):** make
-`in_wild_clock_start` source-aware — drop `vulncheck_kev` from `CATALOG_START` (or floor only
-catalog-add-dated sources), so first-evidence sources keep their pre-2021 events. `[MEASURED]`
+**IMPLEMENTED (commit d23c7b7).** `in_wild_clock_start` now returns `None` when a broad first-evidence
+source (`EVIDENCE_SOURCES = {vulncheck_kev, shadowserver}`) is active — VulnCheck's earliest-wins merge
+self-heals 234/287 CISA-spike CVEs. **google_0day is excluded** (an RE catch on the audit's design:
+~133 CVEs, ~all dropped → it cannot self-heal CISA's backfill, so it must not lift the floor when it
+is the *only* first-evidence source — which also preserved the existing `test_cli.py` contract).
+Unit-tested (`tests/test_in_wild_clock.py`); full suite green. **Still to re-measure:** confirm the
+default +VulnCheck config reproduces the no-floor result, and re-run with the incentive features +
+xgb. `[IMPLEMENTED]`
 
 ### A2. Temporal recalibration — re-estimate only the baseline hazard on a recent window `[LIT]` — **the cheap win the evidence points to**
 
@@ -139,15 +144,26 @@ correct diagnosis and the principled escalation. `[VERIFY×3]`
   grid (the pipeline currently evaluates only 4 horizons), so it is scoped as a follow-on, not yet
   implemented. `[LIT]`
 
-### A5. The one untried *model* worth a bounded bet: shared-frailty illness-death `[LIT]`
+### A5. Untried *model* levers — shared-frailty is a NO-GO; PU-reweight is the cheaper bet `[premise corrected by feasibility audit]`
 
-`SemiCompRisksFreq` (R; Reeder/Lu/Haneuse Biometrics 2023, arXiv:2202.00618) ties three transition
-hazards (PoC→tooling→in-wild) via a shared frailty **estimable from the abundant transitions**, so
-the rare in-wild hazard borrows strength. Highest expected upside of any model pathway (~50-60%),
-but R-only, parametric, and **unproven at 300k rows / 6 GB** — gate on a scaling test before
-investing. PU-survival recency-reweight (Toyabe 2020; SAR-PU) is the cheaper label-noise companion.
-**Do not** pursue TabPFN/SurvivalPFN yet (repo is an empty placeholder; time-discretization
-degenerates at 99.5% censoring). `[VERIFY×3]`
+**Correction (independent feasibility audit, recomputed from real data):** the premise that justified
+shared-frailty — "borrow strength from ~190k abundant transitions" — is a **conflation of
+state-occupancy with transition events**. The real PoC→tooling transition *events* are ~2,577 (not
+190k), and they couple to only **661** of the in-wild CVEs. With VulnCheck the in-wild EPV is now
+**17–21 — no longer EPV-starved**, so penalized Cox is already in its comfort zone (Burk 2026 / Rossi
+2025). Combined with the R-outside-the-backtest-harness cost (it can't ride `rolling_origin_backtest`,
+the project's only validity instrument) and the mixed-estimand clock (B3), **shared-frailty
+illness-death (`SemiCompRisksFreq`) is a NO-GO at current scale**; the pure-Python "poor man's" version
+is the already-failed stacked transfer in disguise (a cause-specific linear predictor is again a
+combination of features the in-wild Cox already has).
+
+**PU recency-reweight** is the cheaper **conditional-GO**: treat censored as unlabeled with a
+recency-dependent propensity `e(x)=f(CVE age)` (lifelines already exposes `weights_col`+`robust`, ~30
+lines). But it's a *calibration* experiment on the underpowered axis (Part E), needs a **fixed**
+propensity assumption (co-estimating it is non-identifiable) and a `min_events` guard (else the
+event-starved-origin fragility that killed temperature recalibration recurs). Honest expected payoff:
+~0, possibly small positive on recent-origin calibration. **Do not** pursue TabPFN/SurvivalPFN
+(empty-placeholder repo; degenerates at 99.5% censoring). `[VERIFY×3 + feasibility-audited]`
 
 ### A6. Fix the non-stationarity *harness* (N5) to measure calibration, not just AUC `[MEASURED]`
 
