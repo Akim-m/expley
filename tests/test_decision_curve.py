@@ -47,3 +47,26 @@ def test_net_benefit_is_censoring_aware_via_km():
     assert abs(row["net_benefit_all"] - (-0.5)) < 1e-9
     assert abs(row["net_benefit_model"] - (-0.5)) < 1e-9
     assert row["flagged_frac"] == 1.0
+
+
+def test_rejects_nan_risk():
+    # a NaN risk is never flagged (NaN >= p_t is False), silently understating net
+    # benefit -- the function must reject it loudly, not degrade quietly.
+    import pytest
+
+    with pytest.raises(ValueError):
+        net_benefit_table(
+            np.array([0.5, np.nan]), np.array([10.0, 20.0]),
+            np.array([True, False]), horizon=15, thresholds=[0.3],
+        )
+
+
+def test_rejects_degenerate_threshold():
+    # p_t=1.0 has an infinite odds weight (ZeroDivisionError / -inf) -> rejected.
+    import pytest
+
+    with pytest.raises(ValueError):
+        net_benefit_table(
+            np.array([0.5]), np.array([10.0]), np.array([True]),
+            horizon=5, thresholds=[1.0],
+        )

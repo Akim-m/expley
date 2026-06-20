@@ -544,9 +544,12 @@ def test_in_wild_clock_start_picks_latest_active_catalog(monkeypatch):
     # no catalog source active (google_0day has genuine dates) -> no filter
     assert cli.in_wild_clock_start(("google_0day", "censored")) is None
     assert cli.in_wild_clock_start(()) is None
-    # with multiple catalog sources, take the latest (most conservative) start
-    monkeypatch.setitem(cli.CATALOG_START, "vulncheck_kev", "2024-02-01")
-    assert cli.in_wild_clock_start(("kev", "vulncheck_kev", "google_0day")) == "2024-02-01"
+    # a first-evidence source (VulnCheck) LIFTS the catalog floor entirely -- it
+    # self-heals CISA's backfill via the earliest-wins merge, so it is not a floor
+    assert cli.in_wild_clock_start(("kev", "vulncheck_kev")) is None
+    # max-over-catalog-add-sources still applies among true catalog sources
+    monkeypatch.setitem(cli.CATALOG_START, "kev2", "2024-02-01")
+    assert cli.in_wild_clock_start(("kev", "kev2")) == "2024-02-01"
 
 
 def test_train_command_rejects_unknown_label_set(tmp_path):
