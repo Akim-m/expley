@@ -201,6 +201,18 @@ def test_era_stress_eval_structure():
         assert res["degradation_delta"] == pytest.approx(res["cross_era_auc"] - res["in_period_auc"])
 
 
+def test_poc_to_exploitdb_registered_and_builds():
+    from temporal_exploit.backtest import LABEL_BUILDERS
+
+    assert "poc_to_exploitdb" in LABEL_BUILDERS
+    corpus = pd.DataFrame({"cve_id": ["A", "B"], "published": pd.to_datetime(["2023-01-01"] * 2, utc=True)})
+    poc = pd.DataFrame({"cve_id": ["A", "B"], "poc_first_seen": pd.to_datetime(["2023-01-01"] * 2, utc=True)})
+    exploitdb = pd.DataFrame({"cve_id": ["A"], "exploitdb_date_published": pd.to_datetime(["2023-01-15"], utc=True)})
+    ef = {"poc": (poc, "poc_first_seen"), "exploitdb": (exploitdb, "exploitdb_date_published")}
+    out = LABEL_BUILDERS["poc_to_exploitdb"](corpus, ef, "2023-06-01")
+    assert int(out["event_observed"].sum()) == 1  # only A transitions PoC -> ExploitDB
+
+
 @pytest.mark.parametrize("model", ["rsf", "gbm"])
 def test_backtest_runs_nonlinear_models(model):
     # the non-linear ensemble methods (RSF, gradient-boosted survival) must ride
