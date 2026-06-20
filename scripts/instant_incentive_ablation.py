@@ -37,7 +37,15 @@ ARTIFACT_DIR = "artifacts/bt_epss"
 SNAPSHOT, START, HORIZONS = "2026-03-14", "2022-01-01", (1, 3, 7, 30, 90)
 MODEL = "xgb"
 
-corpus = load_parquet(OUT_DIR, "cve_corpus", columns=["cve_id", "published"])
+# read the feature matrix first so we know whether to also pull cvss_v3_vector for the
+# incentive build -- one corpus read either way (no double load)
+features_full = pd.read_parquet(f"{ARTIFACT_DIR}/publication_features.parquet")
+need_incentive = not incentive_feature_columns(features_full.columns)
+corpus_cols = ["cve_id", "published"] + (["cvss_v3_vector"] if need_incentive else [])
+corpus = load_parquet(OUT_DIR, "cve_corpus", columns=corpus_cols)
+if need_incentive:  # prebuilt matrix predates the incentive features (commit 4c66a11)
+    features_full = features_full.merge(build_incentive_features(corpus), on="cve_id", how="left")
+
 # first_weaponization needs all event sources; load fresh (data/live) with handover fallback
 event_frames = {}
 for source, (parquet_name, date_col) in EVENT_SOURCES.items():
@@ -49,12 +57,6 @@ for source, (parquet_name, date_col) in EVENT_SOURCES.items():
         event_frames[source] = (frame, date_col)
 print(f"sources loaded={sorted(event_frames)}", flush=True)
 
-features_full = pd.read_parquet(f"{ARTIFACT_DIR}/publication_features.parquet")
-# the prebuilt matrix predates the incentive features (commit 4c66a11) -> build + merge now
-if not incentive_feature_columns(features_full.columns):
-    corpus_inc = load_parquet(OUT_DIR, "cve_corpus", columns=["cve_id", "cvss_v3_vector"])
-    features_full = features_full.merge(build_incentive_features(corpus_inc), on="cve_id", how="left")
-    del corpus_inc
 epss_cols = epss_feature_columns(features_full.columns)
 incentive_cols = incentive_feature_columns(features_full.columns)
 meta = [c for c in ("cve_id", "published") if c in features_full.columns]

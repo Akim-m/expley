@@ -243,13 +243,15 @@ def test_evaluate_survival_supports_short_horizons():
     assert fracs == sorted(fracs)  # monotone non-decreasing in horizon
 
 
-def test_cause_specific_cindex_ranks_risk():
-    from temporal_exploit.modeling import cause_specific_cindex
+def test_transition_cindex_ranks_risk_and_guards_all_censored():
+    from temporal_exploit.modeling import transition_cindex
 
     durations = [10.0, 20.0, 30.0, 40.0]
     events = [True, True, True, False]  # last is a competing event / censored
     risk = [4.0, 3.0, 2.0, 1.0]  # higher risk -> earlier transition (perfect concordance)
-    assert cause_specific_cindex(durations, risk, events) > 0.9
+    assert transition_cindex(durations, risk, events) > 0.9
+    # zero observed events -> no admissible pairs -> None, not a ZeroDivisionError
+    assert transition_cindex(durations, risk, [False, False, False, False]) is None
 
 
 def test_evaluate_survival_rsf():
