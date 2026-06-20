@@ -182,6 +182,25 @@ def test_publication_only_view_runs_in_backtest():
     assert res["aggregate"]["n_origins"] >= 1
 
 
+def test_era_stress_eval_structure():
+    # train on the pre-train_max era, test on the post-test_min era, vs an in-period
+    # control so the delta is DEGRADATION not difficulty. Quantifies non-stationarity.
+    from temporal_exploit.backtest import era_stress_eval
+
+    corpus, ev, features = _setup()
+    res = era_stress_eval(
+        corpus, ev, features, "2024-06-01", train_max="2022-12-31", test_min="2023-06-01",
+        in_period_split="2021-12-31", model="cox", metric_horizon=90,
+    )
+    assert {"cross_era_auc", "in_period_auc", "degradation_delta", "n_cross_test_events"} <= set(res)
+    for k in ("cross_era_auc", "in_period_auc"):
+        if res[k] is not None:
+            assert 0.0 <= res[k] <= 1.0
+    assert res["n_cross_test_events"] >= 0
+    if res["cross_era_auc"] is not None and res["in_period_auc"] is not None:
+        assert res["degradation_delta"] == pytest.approx(res["cross_era_auc"] - res["in_period_auc"])
+
+
 @pytest.mark.parametrize("model", ["rsf", "gbm"])
 def test_backtest_runs_nonlinear_models(model):
     # the non-linear ensemble methods (RSF, gradient-boosted survival) must ride
