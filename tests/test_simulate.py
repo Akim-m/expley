@@ -1,4 +1,3 @@
-import numpy as np
 
 from temporal_exploit.simulate import synth_weaponization
 
@@ -18,7 +17,6 @@ def test_synth_schema_and_cure_fraction():
 
 
 def test_synth_signal_is_learnable_and_zero_signal_is_not():
-    import pandas as pd
 
     from temporal_exploit.features import build_publication_features
     from temporal_exploit.labels import build_first_weaponization_labels
