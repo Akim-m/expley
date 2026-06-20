@@ -30,9 +30,16 @@
    model change. `[MEASURED]`
 4. **VulnCheck is a modest net positive, not the clean win the docs imply** — and I corrected
    my own overreach mid-analysis (it does *not* collapse calibration). `[MEASURED][CORRECTED]`
-5. The one **untried model** lever with a real mechanism is **shared-frailty illness-death**
-   (borrows strength from the abundant PoC→tooling transitions), but it's R-only and unproven
-   at our scale (~50-60% odds). Everything else neural/foundation-model is not ready. `[LIT]`
+5. **No untried model lever survives scrutiny.** Shared-frailty illness-death is a **NO-GO** (the
+   "abundant transitions" premise was state-occupancy, not events; in-wild EPV is now 17–21);
+   PU-reweight is a cheap conditional-GO (calibration only); TabPFN/SurvivalPFN aren't ready. The
+   model-class question is closed. `[feasibility-audited]`
+6. **The defensible headline is the t=0 COLD-START head, not the EPSS-saturated landmark.** The model
+   beats EPSS by **+0.13–0.25 AUC only at disclosure** (where EPSS is ~48% missing + near-chance); at
+   the landmark EPSS saturates it (`no_epss ≥ full`). And at t=0 **EPSS-at-publication HURTS** —
+   dropping it lifts cold-start AUC 0.67→0.78. Lead with cold-start AUC-over-EPSS + the calibrated
+   timing curve (IPA90>0, lead-time ~140d) EPSS can't give. The in-wild model is **Cox** (beats GBM
+   0.846 vs 0.744). `[MEASURED]`
 
 ---
 
@@ -234,14 +241,21 @@ IPA@90 median +0.0003→+0.0000 (neutral), mean −0.003→−0.083 (one outlier
 
 ## Part E — Validity: eval power & in-wild non-stationarity (already answered)
 
-- **Eval power (is "no model beats Cox" a powered equivalence, or just undetectable?).** The
-  rolling-origin paired CIs answer this directly: the backtest **detects a +0.015 AUC@90 ranking
-  effect** (the floor fix, CI [+0.0012, +0.0281] excludes 0) but **cannot resolve IPA/calibration
-  effects below ~±0.15** (VulnCheck IPA@90 paired CI [−0.237, +0.076]). So "no model out-*ranks*
-  Cox by more than ~0.015 AUC" is a *powered* conclusion (stop chasing rankers); "no model improves
-  *calibration*" is **not** powered — the backtest is calibration-underpowered at ~1,200 events.
-  That is the honest reason the calibration frontier (A2/A4) stays open while the model-class
-  question is closed. `[MEASURED]`
+- **Eval power (is "no model beats Cox" a powered equivalence, or just undetectable?) — quantified
+  by a power analysis; corrects an earlier overstatement.** The detectable effect depends on the
+  *comparison*. For a SAME-label-set *coherent* change the **paired**-delta SD is ~0.0066, so the
+  backtest can certify an **IPA@90 gain of ≥~0.005 (paired) / ≥~0.02 (marginal) today** — and it did
+  detect the floor fix's +0.0147 AUC (CI excludes 0, a structural shift). **Correction:** the wide
+  ±0.15 band I first quoted was the *cross-label-set* VulnCheck comparison (different event
+  populations + dominated by the 2022-04 outlier), NOT the resolution for a calibration tweak.
+  **Calibration is therefore NOT fundamentally unmeasurable** — it is underpowered only for sub-0.005
+  IPA tweaks (temporal recal at −0.0008 was one). **Highest-ROI eval fix:** robustify the single
+  outlier origin (2022-10-01, IPA −0.070, also the worst AUC = a genuinely hard cohort) — it
+  contributes **5.6× of the IPA SD**; robust/leave-one-out CIs + per-origin event-weighting drop the
+  marginal MDE 0.0145 → ~0.0026, vs the ~2,750 events (~8 yr quarterly) a sub-0.01 gain would
+  otherwise need. So "no model out-*ranks* Cox by >~0.015 AUC" is powered/closed; a real ≥0.02 IPA
+  *calibration* gain is detectable now (the floor fix is one) — the frontier is open AND measurable.
+  `[MEASURED — corrected]`
 - **In-wild non-stationarity (the N5 validity gate) is visible in the per-origin IPA trajectory**
   (`artifacts/vulncheck_diagnose.json`): IPA@90 swings from a +0.005 median to −1.17 at the 2022-04
   origin (a real 98-event window) while AUC stays ~0.81 throughout — i.e. **calibration, not ranking,
@@ -249,3 +263,36 @@ IPA@90 median +0.0003→+0.0000 (neutral), mean −0.003→−0.083 (one outlier
   explains *why* the floor fix helps (a broader training era stabilizes the baseline hazard). A
   dedicated single-split in-wild era-stress would be *more* event-starved than this per-origin view,
   so it is the wrong instrument here. `[MEASURED]`
+
+---
+
+## Part F — Strategic conclusion (after the enabler analyses)
+
+Two team analyses (evaluation power + marginal-value-over-EPSS, both on existing artifacts) resolve
+the direction:
+
+1. **The model's defensible value is the INSTANT t=0 cold-start head — where it beats EPSS — not the
+   EPSS-saturated landmark.** Measured (full vs `epss_only`, in-wild, 14 origins): at t=0 the model
+   lifts AUC **+0.13 to +0.25** over EPSS-at-publication (CIs exclude 0), because at disclosure EPSS is
+   **missing for ~48% of CVEs and near-chance (AUC 0.46–0.53)** for the rest. At L=30 (EPSS has a
+   trajectory) the edge shrinks to +0.06–0.11 and **`no_epss ≥ full`** — the EPSS-saturated regime F6
+   flagged. **Do NOT headline in-wild-at-landmark ranking; reviewers will find `no_epss ≥ full`.**
+2. **At t=0, EPSS-at-publication HURTS — drop it from the cold-start head.** Median AUC30: `epss_only
+   0.525 → full-with-EPSS 0.670 → no_epss 0.783`. EPSS-at-publication is a ~48%-missing near-random
+   feature the booster overfits; it only helps once it has a *trajectory*. **Concrete recommendation:**
+   the instant head's `feature_view="publication_only"` strips landmark cols but NOT `epss_at_publication*`
+   — it should also drop them (a `publication_only_no_epss` view). Measured gain: cold-start AUC30
+   0.67 → 0.78.
+3. **Honest value proposition (lead with these):** (a) cold-start **AUC-lift-over-EPSS at t=0**
+   (+0.13–0.25); (b) the **calibrated time-to-event curve** EPSS structurally can't give — lead-time
+   ~140d, **IPA90 > 0**, decision-useful net benefit at the 0.3% base rate (Part A4). The in-wild model
+   is **Cox** (beats GBM 0.846 vs 0.744). Do not over-claim a landmark ranking win over EPSS.
+4. **The eval can measure the gains worth having** (Part E, corrected): a ≥0.02 IPA / structural AUC
+   change is certifiable now; the cheap power win is robustifying the one outlier origin (2022-10),
+   not waiting ~8 years for more events.
+
+**Net re-aim:** the project headline is the **t=0 cold-start in-wild head (structured features,
+EPSS-at-publication dropped), led by AUC-lift-over-EPSS + the calibrated timing curve** — the one
+regime where this model is not competing with EPSS, and wins. Fancier in-wild-at-landmark models are
+closed/saturated. The highest-leverage *engineering* work is the label asset (Part A1) and powering
+the eval (above); the highest-leverage *framing* work is this cold-start re-aim.
