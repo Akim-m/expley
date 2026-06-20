@@ -3,6 +3,7 @@ import io
 import json
 import zipfile
 
+import pandas as pd
 import pytest
 
 from temporal_exploit.fetch.nvdplus import NvdPlusConnector
@@ -79,6 +80,23 @@ def test_parse_chunks_across_boundary(monkeypatch):
         zf.writestr("nvd.json", json.dumps({"data": entries}))
     df = NvdPlusConnector._parse(buf.getvalue())
     assert len(df) == 11 and df["cve_id"].is_unique
+
+
+def test_fetch_to_parquet_streams_to_disk(monkeypatch, tmp_path):
+    # the full-corpus path writes chunk-by-chunk via a ParquetWriter (never holds
+    # the whole corpus); force a tiny chunk so the multi-write/cast path runs
+    monkeypatch.setattr("temporal_exploit.fetch.nvdplus._CHUNK", 1)
+    zpath = tmp_path / "nvd.zip"
+    zpath.write_bytes(_zip({"data": [ENTRY, {"cve": {**ENTRY, "id": "CVE-2026-2"}}]}))
+    monkeypatch.setattr(NvdPlusConnector, "_backup_url", lambda self, t: "u")
+    monkeypatch.setattr(NvdPlusConnector, "_download", lambda self, u: str(zpath))
+    out = tmp_path / "corpus.parquet"
+    n = NvdPlusConnector().fetch_to_parquet("tok", out)
+    assert n == 2
+    df = pd.read_parquet(out)
+    assert list(df["cve_id"]) == ["CVE-2026-1", "CVE-2026-2"]
+    assert df["cvss_v3_base"].iloc[0] == 8.8
+    assert not zpath.exists()  # temp download cleaned up
 
 
 def test_fetch_requires_token():
