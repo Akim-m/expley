@@ -105,6 +105,45 @@ def test_backtest_landmark_days_restarts_clock():
     assert lm["aggregate"]["test_events_total"] <= base["aggregate"]["test_events_total"]
 
 
+def _ntrain_by_origin(res):
+    return {o["origin"]: o["n_train"] for o in res["per_origin"]}
+
+
+def test_backtest_embargo_shrinks_training_set():
+    # embargo_days excludes CVEs published within embargo_days of each origin, so a
+    # landmark window [pub, pub+L] is closed before the origin (no as-of-T leak).
+    corpus, ev, features = _setup()
+    origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
+    base = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,), embargo_days=0
+    )
+    emb = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,), embargo_days=120
+    )
+    base_nt, emb_nt = _ntrain_by_origin(base), _ntrain_by_origin(emb)
+    shared = set(base_nt) & set(emb_nt)
+    assert shared
+    assert all(emb_nt[o] <= base_nt[o] for o in shared)  # embargo never adds rows
+    assert any(emb_nt[o] < base_nt[o] for o in shared)  # and removes some
+
+
+def test_landmark_restart_clock_already_prevents_window_leak():
+    # The landmark "leak" (a train window [pub,pub+L] extending past the origin) is
+    # prevented by restart_clock dropping as-of-origin duration <= L (so every train CVE
+    # has pub < t-L), NOT by an embargo. Proof: adding embargo=L on top of landmark_days=L
+    # changes NOTHING -- those rows are already gone. (F6 is sound, not leaked.)
+    corpus, ev, features = _setup()
+    origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
+    no_embargo = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,), landmark_days=60
+    )
+    with_embargo = rolling_origin_backtest(
+        corpus, ev, features, "2024-06-01", origins, model="cox", horizons=(90,),
+        landmark_days=60, embargo_days=60,
+    )
+    assert _ntrain_by_origin(no_embargo) == _ntrain_by_origin(with_embargo)
+
+
 @pytest.mark.parametrize("model", ["rsf", "gbm"])
 def test_backtest_runs_nonlinear_models(model):
     # the non-linear ensemble methods (RSF, gradient-boosted survival) must ride
