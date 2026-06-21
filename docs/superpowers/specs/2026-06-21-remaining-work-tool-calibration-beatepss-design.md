@@ -46,6 +46,8 @@ These ship independently; each banks value before the next.
 - **TDD.** Failing test → minimal impl → green → commit, using the tiny fixtures.
 - **Aggressive RE floor (new work):** ≥10 reverse-engineering rounds per sub-project, multi-seed,
   1000-resample bootstrap CIs, and ≥1 adversarial null (label/risk shuffle) per headline claim.
+  **RE delivery rule (user, 2026-06-21):** dispatch the RE via **at most 2 subagents**, each
+  running **3–5 RE loops** (so ≥6–10 independent loops per sub-project across ≤2 agents).
 - **Push after each commit** (standing authorization).
 
 ## D1 — Downstream triage tool
@@ -90,13 +92,22 @@ collapses escalation recall to ~base rate; RAM trace; leaky-column scan on the o
 ### What it does
 Produces the missing horizon-wise reliability deliverable for the chosen models.
 
+### REUSE FINDING (2026-06-21, scope-shrinking)
+The repo **already has** the hard parts, just unwired into any artifact:
+- `modeling.calibration_table(pred_event, frame, horizon, n_bins, min_events_per_bin)` — already
+  does censoring-aware **KM-within-bin** reliability per horizon (adaptive bin count). Reuse as-is.
+- `modeling.evaluate_survival(...)` — already returns **per-horizon Brier at 7/30/90/180** +
+  integrated Brier + IPCW/truncated C-index with CIs. Reuse as-is.
+- `modeling.survival_at(model, X, horizons, kind)` — S(t) per horizon → `pred_event = 1 - S`.
+So D2's genuine delta is small: (a) **wire** these into a calibration artifact across the four
+horizons for Cox + XGB-AFT, (b) add the **one missing estimator** — a calibration
+**slope + intercept** (calibration-in-the-large), (c) **bootstrap CIs**, (d) the **doc**.
+
 ### Interface
-- New `src/temporal_exploit/calibration.py::reliability_by_horizon(surv_grid, times, durations,
-  events, horizons=(7,30,90,180), n_bins=10) -> dict` returning, per horizon: predicted event
-  prob `1 - S(t)` binned (deciles), **KM-within-bin observed** event prob (censoring-aware, so
-  bins aren't biased by dropouts), bin counts, IPCW-Brier, and a calibration slope+intercept
-  from a censored-aware logistic fit (Cox-style calibration-in-the-large + slope). Bootstrap
-  (1000) CIs on slope/intercept/Brier.
+- New `src/temporal_exploit/calibration.py::calibration_slope_intercept(pred_event, frame,
+  horizon) -> dict` (the only new estimator): censoring-aware calibration-in-the-large
+  (intercept) + slope via a weighted fit on KM-observed-vs-predicted bins from
+  `calibration_table`. Bootstrap (1000) CIs.
 - Script `scripts/calibration_by_horizon.py`: loads the locked time-split test set, fits Cox +
   XGB-AFT (the two chosen classical models), builds survival grids, calls the function, writes
   `artifacts/.../calibration_by_horizon.json` and a markdown table; optional reliability-curve
