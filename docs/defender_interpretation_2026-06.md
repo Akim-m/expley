@@ -24,7 +24,7 @@ A defender triaging at **publication time** ranks CVEs and patches the top slice
 | top 5% | 0.39 | 0.019 |
 | **top 10%** | **0.52 [0.40, 0.65]** | 0.012 |
 
-(KEV-within-90d base rate = 0.0024; 66 KEV events; recall CI is a 1000-resample bootstrap.) Watching the **top 10% of PoC'd CVEs catches ~half of those that reach CISA-KEV in-wild exploitation**, with a **median ~42-day lead** before the KEV listing. RE: no leakage (no KEV/snapshot features), and an adversarial risk-shuffle drops recall to 0.14 (≈ random) — so the 0.52 is real signal, not base-rate inflation. **This is exactly what EPSS-at-publication cannot give:** it is conditional on the observable PoC-present state and yields a *time-to-in-wild* ranking, not a static 30-day probability.
+(KEV-within-90d base rate = 0.0024; 66 KEV events; recall CI is a 1000-resample bootstrap.) Watching the **top 10% of PoC'd CVEs catches ~half of those that reach CISA-KEV in-wild exploitation**, with a **median ~4-day lead** (p75 ~11 d) between the PoC appearing and the KEV listing. RE: no leakage (no KEV/snapshot features), and an adversarial risk-shuffle drops recall to 0.10–0.14 (≈ random) — so the 0.52 is real signal, not base-rate inflation. **This is exactly what EPSS-at-publication cannot give:** it is conditional on the observable PoC-present state and yields a *time-to-in-wild* ranking, not a static 30-day probability. **(Correction, 2026-06-21:** an earlier draft said "~42-day / ~6-week lead." That was a metric bug — `operating_points` reported `horizon − duration` ("horizon remaining") instead of the time-from-PoC-to-KEV. The honest lead is short: median ~4 d, p75 ~11 d. KEV-listed CVEs tend to get their PoC and their listing close together. The *recall* claim, 0.515, was always correct and reproduces exactly.)
 
 ## The model improvement — a state-aware escalating triage score
 
@@ -33,7 +33,7 @@ A single static model is dominated (by EPSS at the top in state 1; data-limited 
 1. **State PUBLISHED (no PoC yet):** triage by **EPSS** (best top-k ranker), with two cheap, RE-verified context modifiers from this project:
    - **ATT&CK tactic (RQ3):** CVEs whose techniques map to **Defense Evasion / Persistence** weaponize fastest (median time-to-PoC ~35–46 d vs ~63–72 d for Credential/Initial Access; log-rank p≈1e-102, survives shuffle + de-overlap) → bump their priority.
    - **time-to-PoC incidence (RQ1):** publication features rank *which* CVEs get a PoC (~0.59) but barely *when* (timing-only c-index 0.534) — so treat "will it get a PoC" as the signal, not a precise ETA.
-2. **State POC-PRESENT (a public PoC appears):** **escalate** — run the **PoC→KEV** model. The top decile captures ~52% of eventual in-wild exploitation ~weeks ahead. This is the project's deployable contribution.
+2. **State POC-PRESENT (a public PoC appears):** **escalate** — run the **PoC→KEV** model. The top decile captures ~52% of eventual in-wild exploitation a median ~4 days (p75 ~11 d) ahead of the KEV listing. The lead is short but real — a pre-emptive-patch window before CISA lists it. This is the project's deployable contribution.
 
 This composite beats EPSS-alone (it adds the state-2 escalation EPSS can't provide) and beats any single survival model (it uses EPSS where EPSS wins). It is a *complement* to EPSS along the weaponization pipeline — precisely the role the framing doc prescribes, not an EPSS replacement.
 
@@ -41,7 +41,7 @@ This composite beats EPSS-alone (it adds the state-2 escalation EPSS can't provi
 
 - **At disclosure:** keep using EPSS for the first-cut patch ranking — our survival layer does not beat it there, and pretending otherwise would be dishonest.
 - **Add the pipeline context we *can* defensibly provide:** flag Defense-Evasion/Persistence-tactic CVEs as fast-weaponizers; treat the time-to-PoC model as a "will-it-get-a-PoC" incidence signal.
-- **The moment a public PoC lands, escalate:** the PoC→KEV model flags the ~10% of PoC'd CVEs that carry ~half the eventual in-wild risk, with a median ~6-week head start — the window to pre-emptively patch/mitigate before CISA-KEV listing. **This is the operational decision the model changes.**
+- **The moment a public PoC lands, escalate:** the PoC→KEV model flags the ~10% of PoC'd CVEs that carry ~half the eventual in-wild risk, with a median ~4-day (p75 ~11-day) head start — a short but real window to pre-emptively patch/mitigate before CISA-KEV listing. **This is the operational decision the model changes.** (The lead is days, not weeks — see the §State-2 correction above.)
 
 ## Honest limits (required framing)
 

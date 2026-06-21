@@ -94,6 +94,24 @@ def test_build_triage_table_schema_and_no_leaky_columns():
     assert not out.loc[out["state"] == PUBLISHED, "escalation_flag"].any()
 
 
+def test_tiers_constant_input_defaults_to_low_not_high():
+    # a no-signal (constant) risk column must NOT flood the top tier
+    t = tiers(np.full(20, 0.5))
+    assert set(t) == {"Low"}
+
+
+def test_operating_points_median_lead_is_time_to_event_not_horizon_remaining():
+    # captured events sit at duration 4 and 6 days; horizon 90.
+    # honest lead = median(time-to-event) = 5, NOT median(90 - d) = 85.
+    n = 100
+    risk = np.arange(n, dtype=float)[::-1]  # index 0 highest risk
+    ev = np.zeros(n, bool); dur = np.full(n, 200.0)
+    ev[0] = True; dur[0] = 4.0
+    ev[1] = True; dur[1] = 6.0
+    res = operating_points(risk, dur, ev, horizon=90, ks=(0.10,))
+    assert res["top_10pct"]["median_lead_days"] == pytest.approx(5.0)
+
+
 def test_fast_tactic_cves_flags_defense_evasion_and_persistence():
     from temporal_exploit.attack_tactics import fast_tactic_cves, tactic_of
 
