@@ -15,30 +15,13 @@ import pandas as pd
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import multivariate_logrank_test
 
+from temporal_exploit.attack_tactics import tactic_of  # single source of truth (RQ3 map)
 from temporal_exploit.cli import EVENT_SOURCES, load_optional_event
 from temporal_exploit.loaders import load_parquet
 
 OUT = Path("data/merged")
 SNAP, MIN_PUB = "2026-03-14", "2021-01-01"
 CHAIN = "dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out/technique_cwe_chain.parquet"
-
-# parent-technique -> primary ATT&CK enterprise tactic (curated from the matrix).
-TECH_TACTIC = {
-    "T1574": "Persistence", "T1562": "Defense Evasion", "T1027": "Defense Evasion",
-    "T1083": "Discovery", "T1134": "Privilege Escalation", "T1550": "Lateral Movement",
-    "T1553": "Defense Evasion", "T1539": "Credential Access", "T1036": "Defense Evasion",
-    "T1111": "Credential Access", "T1059": "Execution", "T1068": "Privilege Escalation",
-    "T1203": "Execution", "T1190": "Initial Access", "T1078": "Initial Access",
-    "T1021": "Lateral Movement", "T1499": "Impact", "T1498": "Impact", "T1485": "Impact",
-    "T1005": "Collection", "T1055": "Privilege Escalation", "T1140": "Defense Evasion",
-    "T1112": "Defense Evasion", "T1547": "Persistence", "T1543": "Persistence",
-    "T1485Impact": "Impact", "T1110": "Credential Access", "T1556": "Credential Access",
-    "T1485 ": "Impact",
-}
-
-
-def tactic_of(tid: str) -> str:
-    return TECH_TACTIC.get(tid.split(".")[0], "Other")
 
 
 # clean time-to-PoC labels (clock origin = published, event = earliest PoC per CVE)

@@ -20,28 +20,10 @@ from temporal_exploit.cli import EVENT_SOURCES, load_optional_event
 from temporal_exploit.labels import build_transition_labels
 from temporal_exploit.loaders import load_parquet
 from temporal_exploit.modeling import _risk_scores, prepare_modeling_frame, time_split_frame
+from temporal_exploit.triage import operating_points  # single source of truth (moved into the package)
 
 OUT = Path("data/merged")
 SNAP, MIN_PUB, H = "2026-03-14", "2021-01-01", 30  # triage horizon = 30 days
-
-
-def operating_points(risk, dur, ev, horizon, ks=(0.01, 0.05, 0.10)):
-    """recall@top-k% / precision / median lead-time for a risk ranking at a horizon."""
-    hit = ev & (dur <= horizon)  # event within the triage horizon
-    n_pos = int(hit.sum())
-    order = np.argsort(-risk)  # highest risk first
-    out = {"n": int(len(risk)), "n_pos_within_h": n_pos}
-    for k in ks:
-        topn = max(1, int(len(risk) * k))
-        sel = order[:topn]
-        tp = int(hit[sel].sum())
-        lead = dur[sel][ev[sel]]
-        out[f"top_{int(k*100)}pct"] = {
-            "recall": tp / n_pos if n_pos else None,
-            "precision": tp / topn,
-            "median_lead_days": float(np.median(horizon - lead[lead <= horizon])) if (lead <= horizon).any() else None,
-        }
-    return out
 
 
 corpus = load_parquet(OUT, "cve_corpus", columns=["cve_id", "published"])

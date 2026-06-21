@@ -243,6 +243,24 @@ Generated artifacts land in `artifacts/` (ignored by Git): `modeling_labels.parq
 `publication_features.parquet`, and `manifest.json`. Methodology is documented in
 `docs/modeling_methodology.md`.
 
+### Downstream triage tool (`triage`)
+
+The state-aware triage tool turns the predictions into a per-CVE action list (the
+§"exceptional work" downstream-integration deliverable). It scores only the held-out
+recent cohort (no in-sample optimism) and **switches tool by observable state**:
+`PUBLISHED` → structural first-weaponization risk tier + EPSS + RQ3 fast-tactic bump;
+`POC_PRESENT` → escalate via the PoC→KEV model.
+
+```bash
+.venv/bin/temporal-exploit triage \
+  --out-dir data/merged --artifact-dir artifacts/merged --report-dir artifacts/merged \
+  --snapshot-date 2026-03-14 --min-pub 2021-01-01
+```
+
+Writes `triage_scored.parquet` (all scored CVEs), `triage_top.csv` (top 200), and
+`triage_summary.json`. Decision logic is the pure, unit-tested `temporal_exploit.triage`
+module; the rationale is in `docs/defender_interpretation_2026-06.md`.
+
 ## Memory: check RAM/VRAM limits before any model work
 
 **Always check free RAM (and VRAM if using `xgb`/`--deep`) before building or
