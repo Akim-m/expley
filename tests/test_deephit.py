@@ -69,3 +69,34 @@ def test_evaluate_deephit_caps_eval_rows():
     model = fit_deephit(train, epochs=4, num_durations=8, batch_size=128)
     res = evaluate_deephit(model, test, max_eval=60)
     assert res["n_test"] == 60
+
+
+def _tie_heavy(n=2000, seed=0):
+    """Tie-heavy durations force quantile cuts to be non-unique -> deduped."""
+    rng = np.random.default_rng(seed)
+    dur = rng.choice([0, 1, 1, 1, 2, 2, 5, 10, 30, 90, 200, 500.0], n).astype(float)
+    cause = rng.choice([0, 0, 1, 1, 2], n)
+    return pd.DataFrame({
+        "cve_id": [f"C{i}" for i in range(n)],
+        "published": pd.Timestamp("2022-01-01", tz="UTC"),
+        "duration_days": np.maximum(dur, 0.1),
+        "event_cause": np.where(cause == 0, "censored", cause.astype(str)),
+        "cause_code": cause, "event_observed": cause > 0,
+        "f1": rng.normal(0, 1, n), "f2": rng.integers(0, 2, n).astype(float),
+    })
+
+
+def test_quantile_cuts_dedupe_does_not_crash_predict():
+    """Regression: quantile discretization on tie-heavy durations deduped the cut
+    grid (e.g. 20 -> fewer), but the net was hardwired to the requested count, so
+    predict_cif raised a shape mismatch. The net must size to len(labtrans.cuts)."""
+    pytest.importorskip("torch")
+    pytest.importorskip("pycox")
+    fr = _tie_heavy()
+    model = fit_deephit(fr, alpha=0.2, scheme="quantiles", num_durations=20, epochs=2, seed=0)
+    assert len(model.duration_index_) < 20            # cuts were actually deduped
+    ev = evaluate_deephit(model, fr, horizons=(30, 90))  # previously crashed here
+    assert ev["kind"] == "deephit"
+    cif = model.cif_at(fr.head(10), [30, 90])
+    assert cif.shape == (10, len(model.causes_), 2)
+    assert np.isfinite(cif).all()
