@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from temporal_exploit.calibration import (
+    _km_event_prob_at,
     _wls_slope_intercept,
     apply_temperature,
     calibration_slope_intercept,
@@ -36,6 +37,24 @@ def test_temperature_preserves_ranking():
     before = np.argsort(surv[:, 0])
     after = np.argsort(apply_temperature(surv, a)[:, 0])
     assert np.array_equal(before, after)  # monotone in S -> AUC/recall unchanged
+
+
+def test_km_event_prob_matches_lifelines_exactly():
+    # the vectorized product-limit must equal lifelines' KM at the horizon, incl.
+    # ties and censoring, or the fast calibration bootstrap would drift.
+    from lifelines import KaplanMeierFitter
+    rng = np.random.default_rng(3)
+    for seed in range(5):
+        n = rng.integers(50, 400)
+        dur = rng.choice([1, 1, 2, 5, 5, 10, 30, 90, 200.0], n)  # ties on purpose
+        ev = rng.random(n) < 0.6
+        for h in (7, 30, 90):
+            km = KaplanMeierFitter().fit(dur, ev)
+            expected = 1.0 - float(km.predict(h))
+            assert _km_event_prob_at(dur, ev, h) == pytest.approx(expected, abs=1e-9)
+    # empty / no-event edge cases
+    assert _km_event_prob_at(np.array([]), np.array([], bool), 30) == 0.0
+    assert _km_event_prob_at(np.array([100.0]), np.array([False]), 30) == 0.0
 
 
 def test_wls_slope_intercept_recovers_known_line():

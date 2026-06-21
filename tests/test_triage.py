@@ -64,6 +64,18 @@ def test_recommended_action_covers_each_branch():
     assert "routine" in f.lower()
 
 
+def test_build_triage_table_no_signal_epss_does_not_flood_first_wave():
+    # EPSS heavily tied at 0 (no readings): q90 collapses to the min -> the guard
+    # must flag NONE as high-EPSS rather than flooding the first-wave action.
+    n = 40
+    meta = pd.DataFrame({"cve_id": [f"CVE-2024-{i:04d}" for i in range(n)],
+                         "published": pd.to_datetime(["2024-01-01"] * n, utc=True)})
+    epss_all_zero = np.zeros(n)
+    out = build_triage_table(meta, np.linspace(0, 1, n), epss_all_zero,
+                             np.zeros(n, bool), np.zeros(n, bool))
+    assert not (out["recommended_action"] == "patch in first wave (high EPSS)").any()
+
+
 def test_build_triage_table_schema_and_no_leaky_columns():
     n = 50
     rng = np.random.default_rng(0)
