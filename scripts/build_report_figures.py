@@ -20,7 +20,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
-REPO = "/home/akim/Coding/Expl"
+# repo root = parent of this script's scripts/ dir, so figures land in the repo
+# (or git worktree) the script is actually run from, not a hardcoded path.
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIGDIR = os.path.join(REPO, "docs", "figures")
 os.makedirs(FIGDIR, exist_ok=True)
 
@@ -336,6 +338,59 @@ def fig_epss_ablation():
     save(fig, "fig_epss_ablation.png")
 
 
+# ===========================================================================
+# 9. EPSS PARITY  — same in-wild target, honest head-to-head (corrected)
+# ===========================================================================
+def fig_epss_parity():
+    # grounded in artifacts/inwild_epss_parity.json (15 origins, 1,310 in-wild events)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(9.8, 4.3))
+
+    # Panel A: AUC@30 — structural vs raw EPSS vs the collapsed naive arm
+    arms = ["Structural\n(ours, no EPSS)", "EPSS\n(raw percentile)", "EPSS xgb-naive\n(artifact)"]
+    auc = [0.795, 0.695, 0.501]
+    bars = a1.bar(arms, auc, color=[BLUE, GREEN, GREY], width=0.62)
+    bars[2].set_hatch("//")
+    bars[2].set_alpha(0.5)
+    a1.axhline(0.5, ls="--", color=GREY, lw=1)
+    a1.text(2, 0.508, "chance", color=GREY, fontsize=7.5, ha="center")
+    a1.set_ylim(0.45, 0.9)
+    a1.set_ylabel("in-wild AUC@30 (ranking)")
+    a1.set_title("Ranking: structural modestly > EPSS")
+    for r, v in zip(bars, auc):
+        a1.text(r.get_x() + r.get_width() / 2, v + 0.008, f"{v:.3f}", ha="center", fontweight="bold")
+    a1.annotate("paired Δ +0.100\n[0.055, 0.145]", xy=(0, 0.795), xytext=(0.7, 0.86),
+                fontsize=8, color=NAVY, ha="center",
+                arrowprops=dict(arrowstyle="->", color=NAVY, lw=1.1))
+    a1.text(2, 0.55, "EPSS wrapped in\nan AFT fit collapses\n→ measurement artifact",
+            fontsize=6.8, color=RED, ha="center", va="bottom")
+
+    # Panel B: recall@top-k — structural vs raw EPSS
+    ks = ["top-1%", "top-5%", "top-10%"]
+    struct = [0.051, 0.274, 0.472]
+    epss = [0.068, 0.213, 0.271]
+    x = [0, 1, 2]
+    w = 0.38
+    a2.bar([xi - w / 2 for xi in x], struct, w, color=BLUE, label="Structural (ours)")
+    a2.bar([xi + w / 2 for xi in x], epss, w, color=GREEN, label="EPSS (raw)")
+    a2.set_xticks(x)
+    a2.set_xticklabels(ks)
+    a2.set_ylim(0, 0.56)
+    a2.set_ylabel("recall @ top-k  (in-wild within 30d)")
+    a2.set_title("EPSS sharper at top-1%; we win 5–10%")
+    a2.legend(fontsize=8, loc="upper left")
+    for xi, s, e in zip(x, struct, epss):
+        a2.text(xi - w / 2, s + 0.008, f"{s:.2f}", ha="center", fontsize=7.5, fontweight="bold")
+        a2.text(xi + w / 2, e + 0.008, f"{e:.2f}", ha="center", fontsize=7.5, fontweight="bold")
+    a2.annotate("EPSS wins\nthe sharp top", xy=(-w / 2, 0.068), xytext=(0.4, 0.22),
+                fontsize=7.5, color=GREEN, ha="center",
+                arrowprops=dict(arrowstyle="->", color=GREEN, lw=1))
+
+    fig.suptitle("Same target as EPSS: a modest ranking win + a precision tie — not a blowout",
+                 fontsize=12, fontweight="bold", color=NAVY, y=1.02)
+    fig.tight_layout()
+    save(fig, "fig_epss_parity.png")
+
+
 if __name__ == "__main__":
     fig_pipeline()
     fig_two_heads()
@@ -345,4 +400,5 @@ if __name__ == "__main__":
     fig_patch_race()
     fig_label_funnel()
     fig_epss_ablation()
+    fig_epss_parity()
     print("\nAll figures written to", FIGDIR)

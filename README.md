@@ -39,6 +39,18 @@ and compiled into a 16-page report,
 [`docs/project_report_2026-06-23.pdf`](docs/project_report_2026-06-23.pdf). Regenerate
 both with the reproduce block at the end of this section.
 
+### In-wild EPSS parity — do we beat EPSS on the *same* target?
+
+![EPSS parity: structural modestly beats EPSS on ranking, ties on precision, EPSS wins the sharp top-1%](docs/figures/fig_epss_parity.png)
+
+*On the target EPSS actually predicts — in-wild exploitation (CISA KEV / Google 0-day /
+VulnCheck) within 30 days of publication — our publication-time structural model beats EPSS on
+**ranking** by a modest, significant margin (**+0.100 AUC@30 [0.055, 0.145]**), is **tied on
+precision** (PR-AUC), and **loses the sharp top-1%** (EPSS's calibrated-probability strength). A
+complement, not a blowout. The greyed "xgb-naive" bar (0.501) is a measurement artifact —
+wrapping EPSS's calibrated score in a survival fit collapses it, so the honest baseline ranks EPSS
+directly. Full writeup: [`docs/inwild_epss_parity_2026-06.md`](docs/inwild_epss_parity_2026-06.md).*
+
 ### The pipeline
 
 ![Data-flow pipeline: external sources to fetch/refresh to merge to build-dataset to train to metrics](docs/figures/fig_pipeline.png)
