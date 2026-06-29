@@ -31,24 +31,38 @@ the free Research Community grant.
 
 - **Research Community / VIP** — free, non-commercial; eligible: students, teachers, independent
   researchers, integration devs. Apply at `info.greynoise.io/community/research-program-request`;
-  a team member confirms. Grants "full access to the Enterprise API" incl. CVE endpoints + GNQL.
-- Auth header is `key: <token>` (GreyNoise convention), **not** `Authorization: Bearer`.
-- Bulk CVE lookup: `POST /v3/cves`, up to **10,000 CVEs/request**.
+  a team member confirms. It states "full access to the Enterprise API", which is *expected* to
+  include the CVE endpoints + GNQL — **but not confirmed for `/v3/cves` specifically**: the bulk
+  reference notes it "requires a business email address and appropriate entitlements", and the
+  response shape varies by tier (minimal / basic / advanced). Confirm your token returns
+  `exploitation_activity` on the first live run (the connector fails loud if it doesn't).
+- Auth header is `key: <token>` (GreyNoise convention, verified), **not** `Authorization: Bearer`.
+- Bulk CVE lookup: `POST /v3/cves`, up to **10,000 CVEs/request** (verified endpoint/method/cap).
 
 ## The connector (`src/temporal_exploit/fetch/greynoise.py`)
 
 A **prospective accumulator**, the only honest design given rolling-window data:
 
-1. Bulk-query `POST /v3/cves` for the corpus CVE universe (chunked at 10k).
-2. Stamp every CVE with ≥`threat_threshold` threat IPs in `window` (default 30d) as
-   **observed-in-wild as of the snapshot date** (`greynoise_inwild_first_seen`).
+1. Bulk-query `POST /v3/cves` for the corpus CVE universe (chunked at 10k; `key:` auth header).
+2. Stamp every CVE with ≥`threat_threshold` threat IPs in `window` (default 1 / 30d) as
+   **observed-in-wild as of the snapshot date** (`greynoise_inwild_first_seen`). Note GreyNoise's
+   `threat_ip_count` counts threat IPs **scanning OR exploiting** the CVE, so this is "observed
+   in-wild malicious activity" (scan-or-exploit), marginally broader than confirmed exploitation;
+   `threat_threshold` / `window` tune precision↔recall (default favors recall for this rare signal).
 3. Deliberately **ignore** `first_known_published_date` (tooling — would contaminate the in-wild target).
-4. Run on a schedule. The earliest-wins **merge layer** (`merge.py`) collapses repeated daily
-   snapshots into a true **first-observation date** per CVE over time — the architecture already in
-   place turns a dumb daily snapshot into a first-seen dataset for free.
+4. Run on a schedule and call **`connector.accumulate()`** (the CLI does this): it unions each run
+   with the prior saved snapshot **keep-earliest**, so first-seen dates converge over time. This is
+   required — a plain `save()` would *overwrite*, and because the API window is rolling, every CVE
+   that aged out of 30 days would be lost. A `MERGE_SPECS["greynoise"]` entry (`merge.py`) handles
+   the build-time dedup when the delta is later merged onto the corpus.
+5. **Fails loud** if a response carries no `exploitation_activity` for any CVE (minimal-tier token or
+   an unexpected envelope) — returning a misleading empty frame is worse than an error.
 
-Tested in `tests/test_greynoise_fetch.py` (parse contract, window/threshold, dedupe, empty-data
-envelope, token + empty-list short-circuits). Network is not exercised in CI (no live token).
+Tested in `tests/test_greynoise_fetch.py` (10 tests: parse contract, window/threshold, dedupe,
+empty-data + keyed-by-cve-id envelopes, single-object, no-activity loud-fail, accumulate
+keep-earliest, token + empty-list short-circuits). Network is not exercised in CI (no live token);
+the `_post` request body (`{"cves":[...]}`) and bulk envelope are inferred from the sibling
+`POST /v3/ip` (`{"ips":[...]}`) convention and **must be confirmed on the first live-token run**.
 
 ```bash
 # one prospective snapshot (needs the free Research Community token):
