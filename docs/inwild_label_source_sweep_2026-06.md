@@ -51,15 +51,17 @@ and wiring it in would change nothing material.
 
 ## Ranked shortlist — the only things worth (maybe) wiring, all date-quality not count
 
-1. **VulnCheck evidence-URL canonical-date back-fill (highest leverage, no new source).** Our
-   `fetch/vulncheck.py::_best_date` reads `vulncheck_reported_exploitation[].date_added` but
-   **discards the sibling `.url`**. Those `date_added` values are VulnCheck's *ingest* dates; the
-   URLs point at original advisories whose *publish* dates can be earlier. Capture the `url`, fetch
-   each one's canonical publish date, take `min(...)`. Tightens onset dates on the **existing**
-   events using data already in the response — no new dependency. **Caveat:** the payoff is
-   **unmeasured and likely bounded** (VulnCheck is already 27d ahead of CISA and evidence-dated, so
-   most of the parity's +107d median lag is genuine detection lag, not ingest lag). Needs the
-   VulnCheck token to re-fetch the raw catalog (not in this env) + a fragile URL→publish-date scraper.
+1. ~~VulnCheck evidence-URL canonical-date back-fill~~ — **MEASURED DEAD-END (2026-06-30, with the
+   token).** Re-fetched the raw catalog (4,998 CVEs) and inspected the schema directly:
+   each `vulncheck_reported_exploitation[]` object carries **only `{url, date_added}`** — there is
+   **no earlier canonical date field** in the response, and the canary field
+   (`reported_exploited_by_vulncheck_canaries`) is a **boolean** (457 true), not dated telemetry
+   (the dated canary stream is the paid `ipintel` tier). Our `_best_date` already takes the
+   **earliest evidence `date_added`**, which is **197 days median earlier than CISA's catalog-add**
+   for 75% of overlapping CVEs — i.e. the cheap onset-date win is *already captured*. The only path
+   to earlier dates is fetching the **387,130** evidence URLs and parsing each one's publish date —
+   disproportionate effort for a now-confirmed-bounded payoff (the current best-date already sits at
+   ~109d median lag; most of that is genuine detection lag, not ingest lag). **Not worth building.**
 2. **Cisco openVuln API** — the one vendor with a clean *independent* `firstPublished` timestamp
    (free OAuth2, full CSAF archive 2022–2025); exploitation status is prose (text-match). ~10
    exploited Cisco CVEs/yr.
@@ -75,8 +77,15 @@ integrated; P0 `Date discovered` is often earlier anyway), Ivanti (scrape-walled
 
 The honest result of "check for other sources": **the free + historical + non-redundant in-wild
 label space is saturated** — no new source grows the event count, confirming the data-limited
-ceiling yet again. The remaining levers refine *date quality* on existing events and are bounded to
-a few days on ~20 CVEs/yr; #1 is the best of them but needs the token + a scraper and has unmeasured,
-likely-small payoff. **Recommendation: do not build speculative scrapers; the count-ceiling is
-confirmed.** A materially bigger win still requires a fundamentally larger/earlier in-wild *modality*
-(prospective sensor telemetry — GreyNoise academic, accumulated forward), not another catalog.
+ceiling yet again. And with the VulnCheck token in hand (2026-06-30), the best date-quality lever
+(#1) was **measured to a dead-end**: VulnCheck's free catalog has no earlier date than the evidence
+`date_added` we already use (197d median better than CISA), and its canary telemetry is boolean, not
+dated. The only remaining levers are two tiny vendor scrapes (#2 Cisco, #3 Android) worth a few days
+on ~20 CVEs/yr. The token also showed the catalog is fresh through 2026-06-29 (4,998 CVEs, +29 vs
+our shipped snapshot) — but those 29 are recent-2026 CVEs outside the backtest's origin window, so a
+refresh adds **0 test events** to the parity; not worth disturbing the validated 2026-06-20 artifact.
+
+**Bottom line:** every free/historical lever for this comparison is now exhausted *and measured*.
+A materially bigger win requires a fundamentally larger/earlier in-wild **modality** — prospective
+sensor telemetry (GreyNoise academic, accumulated forward via the connector we built) — not another
+catalog or a date-scraper.
