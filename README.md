@@ -30,6 +30,88 @@ The strongest framing is "timeline to public weaponization", not simply
 "real-world exploitation prediction", because most available events are public
 PoC or tooling signals rather than confirmed in-the-wild exploitation.
 
+## Results at a glance
+
+The figures below summarize the project's headline findings. They are generated
+**deterministically** (no network, no retraining) from the repo's `artifacts/*.json`
++ `docs/*.md` by [`scripts/build_report_figures.py`](scripts/build_report_figures.py),
+and compiled into a 16-page report,
+[`docs/project_report_2026-06-23.pdf`](docs/project_report_2026-06-23.pdf). Regenerate
+both with the reproduce block at the end of this section.
+
+### The pipeline
+
+![Data-flow pipeline: external sources to fetch/refresh to merge to build-dataset to train to metrics](docs/figures/fig_pipeline.png)
+
+*The spine is `cli.py` (7 subcommands): external sources → fetch/refresh → merge
+(earliest-wins) → build-dataset (labels + leakage-safe features) → train / competing /
+backtest → metrics + plots. The leakage firewall emits only publication-time-knowable
+features, each logged in `feature_provenance.csv`.*
+
+### Why the in-wild target is hard
+
+![Weaponization funnel and the false-censoring gap](docs/figures/fig_label_funnel.png)
+
+*Of 359,507 CVEs, only 1.38% carry an in-wild label, and EPSS implies roughly 2× more
+true exploitation than is labeled (material false-censoring). This rarity — not the
+model — sets the in-wild ceiling.*
+
+### Two heads, two ceilings
+
+![Two heads: in-wild wins ranking, first-weaponization wins calibration](docs/figures/fig_two_heads.png)
+
+*The in-wild head (Cox, 251 events) wins on ranking (IPCW c-index 0.849 vs 0.598),
+while the first-weaponization head (XGB-AFT, 45,947 events) wins on calibration
+(IPA@180 +0.291 vs −0.001). Neither ceiling is set by the model.*
+
+### Structured features beat EPSS at cold-start
+
+![EPSS ablation: structured features beat EPSS-only at t=0](docs/figures/fig_epss_ablation.png)
+
+*At publication time (t=0), structural features beat an EPSS-only baseline by
++0.176 AUC@30 and +0.173 AUC@90 (paired, walk-forward; 95% CI bars). The lift comes
+from structural signal, not EPSS distillation.*
+
+### Operational value: a calibrated head-start
+
+![Operating points: recall at top-30% and median lead time across landmarks](docs/figures/fig_operating_points.png)
+
+*Recall at the top-30% flagged rises 28% → 34% → 49% across landmarks L=0/7/30d, with
+144/185/226-day median lead time before in-wild exploitation — a head-start EPSS's
+fixed 30-day window cannot give.*
+
+### More labels raise the data ceiling
+
+![VulnCheck label lift: tighter c-index CI as in-wild events grow](docs/figures/fig_vulncheck_lift.png)
+
+*Wiring VulnCheck (+0-day) labels grows usable in-wild test events 106 → 637 → 1,304 and
+tightens the honest c-index CI (width 0.128 → 0.046). The point estimate falls as the
+easy CISA-only cohort is diluted — reliability, not a flashier headline.*
+
+### What causally accelerates weaponization
+
+![Causal hazard-ratio forest: wormable and unauth-network accelerate weaponization](docs/figures/fig_causal_forest.png)
+
+*Adjusted Cox (n=313,847): wormable CVEs (AV:N/PR:N/UI:N/AC:L) weaponize faster
+(HR 1.29 [1.28, 1.31], E-value 1.68, raw median 100d vs 277d), as do unauth-network
+high-impact CVEs (HR 1.24). The ATT&CK-chain estimate is refused (positivity violated).*
+
+### The patch-vs-exploit race
+
+![Patch-vs-exploit race: pre-disclosure weaponization is bimodal](docs/figures/fig_patch_race.png)
+
+*Exploitation beats disclosure ~⅓ of the time (28.6% first-weap / 35.5% in-wild, matched
+by an independent 28.96% on VulnCheck's 2025 KEVs). The race is bimodal: OSS
+coordinated-disclosure fixes land ~14d *before* the CVE, while Project Zero 0-days are
+100% exploited before the patch.*
+
+**Reproduce the figures and report:**
+
+```bash
+.venv/bin/python scripts/build_report_figures.py                  # → docs/figures/*.png (300 dpi)
+.venv/bin/python scripts/build_project_report_pdf_2026-06-23.py   # → docs/project_report_2026-06-23.pdf
+```
+
 ## Project status
 
 High-level checklist of the modeling package (`src/temporal_exploit/`, which
