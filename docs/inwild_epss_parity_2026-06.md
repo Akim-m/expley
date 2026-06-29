@@ -132,11 +132,17 @@ target is a *publication-anchored known-exploited proxy* (above), and why the ne
 ## What would move the precision tie to a win
 
 VulnCheck (above) did not — it sharpened confidence, not the margin. The remaining label lever is
-**GreyNoise**, but it needs the free Research-Community grant (manual approval) and only exposes a
-~90-day rolling CVE window, so it is a *prospective* telemetry stream, weak for historical
-backfill. Net: with CISA KEV + VulnCheck + 0-day already integrated, we are near the honest
-data ceiling for this comparison; a bigger win likely requires a fundamentally larger/earlier
-in-wild signal, not a fancier model.
+**GreyNoise** — and its API was verified end-to-end (2026-06-30, [`greynoise_inwild_2026-06.md`](greynoise_inwild_2026-06.md)).
+Finding: the free Research-Community grant *does* give Enterprise CVE-API access, **but the in-wild
+observation data is a rolling ≤30-day window with no per-CVE first-observed date** — the only
+historical per-CVE date is *first exploit-code published* (tooling, = our first-weaponization
+signal, not in-wild). So GreyNoise **cannot backfill history**; it is a *prospective* stream. We
+built `fetch/greynoise.py` as a forward accumulator (ready + tested) so the project can start
+banking onset-accurate labels going forward, but it adds **0 historical events** and does not move
+this result. Net: with CISA KEV + VulnCheck + 0-day already integrated and GreyNoise confirmed
+backfill-incapable, we are **at the honest data ceiling** for this *historical* comparison — a
+bigger win needs a fundamentally larger/earlier in-wild signal accumulated prospectively, not a
+fancier model.
 
 ## Reproduce
 
