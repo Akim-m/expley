@@ -8,6 +8,7 @@ Metrics: ranking AUC@30/90, PR-AUC@30, and EPSS's deployment metric recall@top-1
 Prints an honest verdict (where EPSS wins, where we win) with paired CIs on AUC/PR-AUC.
 """
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -34,7 +35,14 @@ for source, (parquet_name, date_col) in EVENT_SOURCES.items():
         frame = load_optional_event(OUT_DIR, parquet_name, date_col)
     if frame is not None:
         event_frames[source] = (frame, date_col)
-print(f"in-wild sources loaded={sorted(event_frames)}", flush=True)
+# optional in-wild label subset for the VulnCheck label-lift comparison
+# (e.g. INWILD_SUBSET=kev = CISA-only; default = all in-wild sources)
+_subset = os.environ.get("INWILD_SUBSET")
+_tag = ("_" + _subset.replace(",", "-")) if _subset else ""
+if _subset:
+    _keep = {s.strip() for s in _subset.split(",")}
+    event_frames = {k: v for k, v in event_frames.items() if k in _keep}
+print(f"in-wild sources loaded={sorted(event_frames)} (subset={_subset or 'all'})", flush=True)
 
 features_full = pd.read_parquet(f"{ARTIFACT_DIR}/publication_features.parquet")
 epss_cols = epss_feature_columns(features_full.columns)
@@ -98,7 +106,7 @@ out = {
     },
 }
 Path("artifacts").mkdir(exist_ok=True)
-with open("artifacts/inwild_epss_parity.json", "w") as fh:
+with open(f"artifacts/inwild_epss_parity{_tag}.json", "w") as fh:
     json.dump(out, fh, indent=2, sort_keys=True, default=str)
 
 s = out["per_arm"]["structural"]
@@ -113,4 +121,4 @@ for k in KS:
     sv, ev = s["recall_at_top_30"][kk], e["recall_at_top_30"][kk]
     winner = "structural" if (sv or 0) > (ev or 0) else "EPSS"
     print(f"recall@top-{k:.0%}@30   structural {sv}  vs EPSS-score {ev}   -> {winner} wins")
-print("wrote artifacts/inwild_epss_parity.json")
+print(f"wrote artifacts/inwild_epss_parity{_tag}.json")

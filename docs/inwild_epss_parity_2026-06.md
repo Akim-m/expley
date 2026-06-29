@@ -56,11 +56,34 @@ state-aware:
 So the defensible "win" over EPSS is **as a system**: same-or-better at publication, plus a
 state-conditional escalation EPSS has no mechanism for.
 
+## VulnCheck label lift (measured): more labels tighten the win, don't widen it
+
+VulnCheck KEV is **already wired and fetched** (`src/temporal_exploit/fetch/vulncheck.py` →
+`data/live/vulncheck_kev.parquet`, 4,969 CVEs, fetched 2026-06-20 with the token via the
+`/v3/backup/vulncheck-kev` catalog + earliest `vulncheck_reported_exploitation[].date_added`),
+and it is **already in the headline result above**. Running the parity on **CISA-only** vs
+**CISA + VulnCheck + 0-day** in-wild labels isolates what those labels bought
+(`INWILD_SUBSET=kev` vs default; `artifacts/inwild_epss_parity_kev.json` vs `…_parity.json`):
+
+| In-wild labels | test events | structural AUC@30 | EPSS AUC@30 | structural − EPSS |
+|---|---|---|---|---|
+| CISA KEV only | 425 | 0.769 | 0.662 | +0.107 [0.007, 0.208] |
+| + VulnCheck + 0-day | 1,310 | 0.795 | 0.695 | +0.100 [0.055, 0.145] |
+
+VulnCheck roughly **tripled the usable in-wild events** (425 → 1,310), which **roughly halved the
+structural-vs-EPSS CI** (width 0.20 → 0.09) and turned a barely-significant win into a solid one —
+but it **did not change the gap's magnitude** (+0.10 either way) and **did not break the precision
+(PR-AUC) tie**. More labels bought *reliability*, not a bigger win. The data-limited ceiling is on
+the **gap**, consistent with the project's recurring finding (cf. `fig_vulncheck_lift`).
+
 ## What would move the precision tie to a win
 
-The in-wild ceiling is data-limited (~1,310 usable events, ~1–2% prevalence). The lever is **more
-in-wild labels**: VulnCheck KEV community (free, ~+1,000–1,700 CVEs, dated events) and GreyNoise
-(free research grant; prospective-only, ~90-day window). That is Phase 2.
+VulnCheck (above) did not — it sharpened confidence, not the margin. The remaining label lever is
+**GreyNoise**, but it needs the free Research-Community grant (manual approval) and only exposes a
+~90-day rolling CVE window, so it is a *prospective* telemetry stream, weak for historical
+backfill. Net: with CISA KEV + VulnCheck + 0-day already integrated, we are near the honest
+data ceiling for this comparison; a bigger win likely requires a fundamentally larger/earlier
+in-wild signal, not a fancier model.
 
 ## Reproduce
 
