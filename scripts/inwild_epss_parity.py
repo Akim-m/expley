@@ -1,7 +1,13 @@
-"""EPSS-parity head-to-head: our in-wild model vs EPSS on the SAME target.
+"""EPSS-parity head-to-head: our in-wild model vs EPSS on the in-wild target.
 
-Target = in-wild exploitation (KEV / Google 0-day / VulnCheck) -- exactly what EPSS
-predicts. On identical walk-forward origins, reports for two arms:
+Target = in-wild exploitation (KEV / Google 0-day / VulnCheck) -- the closest honest
+proxy for what EPSS predicts. NOTE (adversarial RE 2026-06-30): in practice the kept
+test events are ~93% VulnCheck-KEV catalog membership (CISA adds ~90, Google 0-day 0 --
+all dropped as pre-publication negative-duration), and the event date is an administrative
+catalog-add date (median lag ~175d), not exploitation onset. So this is a publication-
+anchored known-exploited proxy; the head-to-head is fair (both arms see the identical
+proxy) but "same target as EPSS" is the soft part, not the number.
+On identical walk-forward origins, reports for two arms:
   - epss_only  : the EPSS-at-publication baseline (what EPSS alone gives you)
   - structural : our publication-time structural model with NO EPSS (deployable config)
 Metrics: ranking AUC@30/90, PR-AUC@30, and EPSS's deployment metric recall@top-1/5/10%@30.
@@ -86,7 +92,9 @@ def _auc(agg, metric, h):
 
 
 out = {
-    "target": "in_wild (KEV / Google 0-day / VulnCheck) -- same target as EPSS",
+    "target": ("in_wild (KEV / Google 0-day / VulnCheck) -- publication-anchored known-exploited "
+               "proxy for what EPSS predicts; kept test events ~93% VulnCheck, catalog-add timing "
+               "(median lag ~175d) not exploitation onset"),
     "model": MODEL, "epss_columns": epss_cols, "n_origins": len(origins),
     "epss_arm": ("epss_score = raw epss_percentile_at_publication used directly as risk "
                  "(score_col passthrough); epss_xgb_naive = collapsed model-on-EPSS contrast"),

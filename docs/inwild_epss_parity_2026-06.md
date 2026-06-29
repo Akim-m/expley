@@ -1,19 +1,37 @@
 # In-wild EPSS parity: do we beat EPSS on the same target? (2026-06)
 
-**TL;DR.** On the **same target EPSS predicts** — in-the-wild exploitation (CISA KEV +
-Google 0-day + VulnCheck), within 30/90 days of publication — our publication-time
-structural model **beats EPSS on ranking by a modest, significant margin** (+0.100 AUC@30
-[0.055, 0.145]; +0.134 AUC@90 [0.089, 0.178]), is **statistically tied on precision**
-(PR-AUC), and **loses the very sharp top** (EPSS wins recall@top-1%). It is a complement /
-modest improvement, **not** a blowout. Source: `scripts/inwild_epss_parity.py` →
-`artifacts/inwild_epss_parity.json` (15 walk-forward origins, 1,310 in-wild test events).
+**TL;DR.** On a **publication-anchored known-exploited target** — the closest honest proxy we
+have for what EPSS predicts, in practice ~93% VulnCheck-KEV catalog membership plus CISA KEV,
+scored within 30/90 days of publication — our publication-time structural model **beats EPSS on
+ranking by a modest, significant margin** (+0.100 AUC@30 [0.055, 0.145]; +0.134 AUC@90
+[0.089, 0.178]), is **statistically tied on precision** (PR-AUC), and **loses the very sharp top**
+(EPSS wins recall@top-1%). It is a complement / modest improvement, **not** a blowout. The result
+is **reproducible to the digit and deterministic** (zero run-to-run jitter), the head-to-head is
+**methodologically fair** (identical per-origin test rows/labels for both arms, correct raw-EPSS
+baseline, no leakage, EPSS not starved by missingness), and the win **survives adversarial
+re-verification** (see *Robustness*). Source: `scripts/inwild_epss_parity.py` →
+`artifacts/inwild_epss_parity.json` (15 walk-forward origins, 1,310 test events).
 
 ## Why this is the right comparison (and the headline model is *not*)
 
 EPSS estimates **P(exploited in the wild within 30 days)**. Our *headline* first-weaponization
 label is ~97% public PoC — *exploit tooling appearing*, not a real attack — so comparing it
-to EPSS is apples-to-oranges. The project's **in-wild** label (KEV / 0-day / VulnCheck) is
-what EPSS actually predicts. This work makes that the target and compares fairly.
+to EPSS is apples-to-oranges. The project's **in-wild** label (KEV / 0-day / VulnCheck) is the
+closest thing we have to what EPSS predicts, and this work makes that the target and compares fairly.
+
+**But be honest about what the label actually is** (adversarial RE, 2026-06-30). It is a *proxy*,
+not literally "exploited within 30 days":
+- **It is predominantly VulnCheck.** Of the 1,310 kept test events, **~1,220 (93%) are VulnCheck-KEV
+  catalog membership**, **90 are CISA KEV**, and **Google 0-day contributes zero** kept test events
+  (all 132 are exploited *before* publication → negative-duration → dropped by
+  `prepare_modeling_frame`). So "(KEV / 0-day / VulnCheck)" is in practice *predominantly VulnCheck KEV*.
+- **The event date is an administrative catalog-add date, not exploitation onset.** Among kept test
+  events the median duration (add − published) is **175 days**, and only **~22% fall inside the 30-day
+  horizon** (VulnCheck median lag +107d; CISA +329d). So AUC@30 is largely ranking *eventual* known-
+  exploited status, not crisp 30-day onset. Read the target as a **publication-anchored known-exploited
+  proxy**, and note this if anything *understates* EPSS (it is scored against a catalog-timing proxy of
+  its true objective). The comparison is fair (both arms see the identical proxy); the *name* is the
+  soft part, not the number.
 
 ## The measurement bug we caught (and fixed)
 
@@ -43,6 +61,32 @@ better than EPSS and catches more in the top 5–10%, but EPSS's calibrated prob
 the sharpest tool at the very top-1% and ties us on precision. This matches the project's prior
 independent landmark finding (structural ~0.82 vs EPSS ~0.60 AUC@90).
 
+## Robustness (adversarially re-verified, 2026-06-30)
+
+Two independent adversarial RE passes tried to *break* the corrected +0.100 win (the whole reason
+this work exists is that the *first* run's +0.294 was a measurement artifact). Both confirmed it,
+and surfaced the *mechanism*:
+
+- **Reproduces deterministically.** A from-source re-run gives structural AUC@30 0.795344, EPSS
+  0.695282, paired delta +0.100061 [0.0553, 0.1449], win 13/15 origins — **byte-identical** to the
+  committed artifact; 3 extra structural re-fits gave **zero** run-to-run variance. The win is not
+  nondeterminism jitter.
+- **No EPSS coverage handicap** (the most plausible fake-win mechanism). Missing EPSS is imputed to
+  percentile 0.0, but in-wild positives have **99.9% publication-time EPSS coverage** (1/1,310 missing;
+  **0** of the AUC@30-driving positives missing). Restricting *both* arms to real-EPSS-only rows
+  **widens** the gap (+0.100→**+0.106** AUC@30, +0.134→**+0.137** AUC@90) — the opposite of a coverage
+  artifact.
+- **No structural leakage.** The structural arm trains on 68 columns, all on the CLAUDE.md
+  publication-time-safe list (CVSS/CWE/CPE/ATT&CK one-hots); **no** description text, **no**
+  `vrs_presence`, **no** snapshot EPSS. The two arms are scored on **identical per-origin test frames**
+  (same `cve_id`/duration/event), and the paired CI is genuinely paired on the shared origin key.
+- **The honest mechanism.** In-wild positives sit at a **median publication-time EPSS percentile of
+  just 0.168** — EPSS is a *dynamic* score that climbs as telemetry accumulates, and at disclosure time
+  (t=0, before any telemetry exists) it has not yet reacted to the eventual positives. The CVE's
+  intrinsic CVSS/CWE/CPE structure *is* fully present at t=0, so structural features genuinely
+  out-rank EPSS *at the cold-start moment a defender most needs a signal*. That is the legitimate
+  framing of the win — not "smarter than EPSS," but "better at t=0, where EPSS has nothing to react to."
+
 ## The composite ("beat EPSS as a system")
 
 EPSS is a single publication-time score with no notion of pipeline *state*. Our composite is
@@ -71,10 +115,19 @@ and it is **already in the headline result above**. Running the parity on **CISA
 | + VulnCheck + 0-day | 1,310 | 0.795 | 0.695 | +0.100 [0.055, 0.145] |
 
 VulnCheck roughly **tripled the usable in-wild events** (425 → 1,310), which **roughly halved the
-structural-vs-EPSS CI** (width 0.20 → 0.09) and turned a barely-significant win into a solid one —
-but it **did not change the gap's magnitude** (+0.10 either way) and **did not break the precision
-(PR-AUC) tie**. More labels bought *reliability*, not a bigger win. The data-limited ceiling is on
-the **gap**, consistent with the project's recurring finding (cf. `fig_vulncheck_lift`).
+structural-vs-EPSS CI** (width 0.20 → 0.09; delta SE 0.051 → 0.023) and turned a barely-significant
+win into a solid one — but it **did not change the gap's magnitude** (+0.10 either way) and **did not
+break the precision (PR-AUC) tie** (CISA-only PR-AUC@30 is actually a dead heat, +0.001 wrong way).
+More labels bought *reliability*, not a bigger win. The data-limited ceiling is on the **gap**,
+consistent with the project's recurring finding (cf. `fig_vulncheck_lift`).
+
+**Caveat on what those extra labels are.** The ~885 VulnCheck events that tightened the CI are
+**lower-timing-quality**: median add-minus-publish lag +107d, **>1/3 added more than a year** after
+publication (CISA KEV is no cleaner — median +329d). The CI tightened because *n* grew, not because
+the labels are 30-day-onset-crisper; the +0.10 gap is stable across the two label sets precisely
+because both share the same administrative-timing weakness. This is why the right reading of the
+target is a *publication-anchored known-exploited proxy* (above), and why the next real lever is an
+**earlier, onset-accurate** in-wild signal (telemetry), not simply more catalog memberships.
 
 ## What would move the precision tie to a win
 
