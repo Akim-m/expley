@@ -65,6 +65,20 @@ def _setup(signal=1.5, seed=2):
     return corpus, ev, build_publication_features(corpus)
 
 
+def test_backtest_score_col_bypasses_model_fit():
+    # A calibrated score (e.g. EPSS) must be used DIRECTLY as the ranking, not re-fit
+    # through a survival model (which collapses it to ~chance on rare-event data).
+    # Proof of bypass: with score_col set, the `model` param has NO effect on results.
+    corpus, ev, features = _setup()
+    origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
+    kw = dict(score_col="cvss_v3_base", horizons=(90,))
+    a = rolling_origin_backtest(corpus, ev, features, "2024-06-01", origins, model="cox", **kw)
+    b = rolling_origin_backtest(corpus, ev, features, "2024-06-01", origins, model="rsf", **kw)
+    assert a["aggregate"]["horizon_auc"] == b["aggregate"]["horizon_auc"]
+    assert a["aggregate"]["recall_at_top_by_frac"] == b["aggregate"]["recall_at_top_by_frac"]
+    assert a["aggregate"]["horizon_auc"].get("90") is not None  # the score produced a ranking
+
+
 def test_backtest_recovers_signal_across_origins():
     corpus, ev, features = _setup()
     origins = make_origins("2024-06-01", start="2021-01-01", min_followup_days=180)
