@@ -55,6 +55,16 @@ each with before/after numbers)_
 | Do-not-touch list of 13 verified optimizations compiled | Re-"optimizing" verified numeric code is the main way regressions enter research pipelines. |
 | Literature/methods survey (2024–26) launched before choosing accuracy levers | Standing rule: check current best methods rather than rely on training-set knowledge; avoids re-inventing or picking stale techniques. |
 
+## Investigation phase — additions (2026-07-03)
+
+| What was done | Why |
+|---|---|
+| Methods survey (2024–26) reported; findings folded into the design | Reframes the headline: EPSS v5 shipped 2026-06-15 (claims must state the version tested); the PR-AUC "tie" is inside the noise band at 1310 positives (Boyd 2013); nobody published time-to-in-wild survival modeling 2024–26 — the framing is the differentiator. |
+| Design spec committed (`docs/superpowers/specs/2026-07-03-pipeline-improvement-design.md`, commit 69371c1) | Locks scope, ordering (S1–S4 → A1–A3 → L1), memory gates, and the evidence-based rejected list before any code changes. |
+| Implementation plan for the speed bundle written (`docs/superpowers/plans/2026-07-03-speed-memory-bundle.md`) | Bite-sized TDD tasks with complete code, identity gates against the recorded baseline artifacts, and a mandatory improvement-log step per task. |
+| Discovered S1 is smaller than mapped: build-dataset already persists `landmark_features_{L}d.parquet`; only two scripts still re-stream | Avoids building new persistence machinery (YAGNI); the fix is a guarded cache loader + repointing two scripts. |
+| Discovered the persisted landmark artifacts are stale (2026-06-12, missing the 8 trajectory columns) | The cache loader needs a column-completeness guard with streaming fallback; live artifacts get refreshed in the plan's final task. |
+
 ## Planned levers (ranked, with reasons)
 
 1. **Persist the fused EPSS landmark bundle to parquet; scripts read it instead
