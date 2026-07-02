@@ -26,7 +26,7 @@ from temporal_exploit.cli import (
     load_optional_event,
 )
 from temporal_exploit.epss_features import epss_feature_columns
-from temporal_exploit.landmark import build_epss_features
+from temporal_exploit.landmark import load_epss_at_landmark
 from temporal_exploit.loaders import load_parquet
 
 OUT_DIR = Path("dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out")
@@ -51,8 +51,8 @@ print(f"in-wild sources loaded={sorted(event_frames)} missing={missing}", flush=
 
 # publication features + the landmark EPSS trajectory (one fused EPSS scan)
 features_full = pd.read_parquet(f"{ARTIFACT_DIR}/publication_features.parquet")
-print(f"building landmark EPSS trajectory (L={LANDMARK}) over the 375M-row history ...", flush=True)
-lm_epss = build_epss_features(corpus, EPSS_PATH, landmarks=(LANDMARK,), snapshot_date=SNAPSHOT)[LANDMARK]
+print(f"loading landmark EPSS trajectory (L={LANDMARK}; cache: artifacts/, else stream) ...", flush=True)
+lm_epss = load_epss_at_landmark(corpus, EPSS_PATH, LANDMARK, snapshot_date=SNAPSHOT, artifact_dir="artifacts")
 features_full = features_full.merge(lm_epss, on="cve_id", how="left")
 del lm_epss
 epss_cols = epss_feature_columns(features_full.columns)  # static publication + landmark trajectory
