@@ -43,8 +43,51 @@ Rules of engagement for this effort:
 
 ## Changes landed
 
-_(none yet — investigation phase; entries below move up here as they land,
-each with before/after numbers)_
+| Change | Why | Measured effect |
+|---|---|---|
+| Shared vectorized CVSS parse — `parse_cvss_vectors` (one `str.extract` pass per metric), consumed by `build_publication_features`, `build_incentive_features`, and the build CLI (branch `speed-memory-bundle`) | The same vector string was parsed twice (per-row dict `.map` in features.py, again in incentive_features.py + 8 more `.map` passes); one vectorized parse feeds both builders | Outputs pinned identical by tests (duplicate-key last-wins, missing→None, 'S' vs 'CVSS:' prefix); wall-clock delta measured at Task 7 rebuild; suite 350 passed |
+
+## What's better than before — and where it can still improve
+
+Updated as work lands (user request 2026-07-03). "Model" here = the whole
+modeling pipeline; the in-wild ranking model itself is unchanged so far — the
+current wins are pipeline-level (correctness-preserving speed/memory work) and
+decision-quality (measured framing, evidence-based rejections).
+
+**Better than the old state:**
+
+1. **Every performance claim is now measured, not asserted** — recorded
+   `/usr/bin/time -v` baselines for all four pipeline paths (build 21.3 s/858 MB,
+   EPSS build 4 m 13 s/1.21 GB, backtest 38.5 s/1.03 GB, suite 1 m 47 s/613 MB);
+   the old state had scattered per-fix numbers but no whole-pipeline scoreboard.
+2. **The EPSS-comparison methodology is locked clean** — no EPSS data in
+   training (directive + measured support: EPSS features *hurt* XGB-AFT,
+   −0.114 AUC@30), raw-score-only baseline arm. The old ablations had a
+   model-wrapped EPSS arm that overstated the margin.
+3. **A validated do-not-do list** — focal/SMOTE/deep-swaps/TabPFN/LLM-embeddings/
+   GNN/polars/external-memory each rejected with a citable negative result at
+   our scale, so future sessions don't burn time re-testing fashions.
+4. **CVSS parsing does one vectorized pass instead of ~10 per-row passes**
+   (Task 1, landed) — same outputs, pinned by tests.
+
+**Where it can still improve (honest list):**
+
+1. **The headline metric is the wrong idiom** — PR-AUC@30 "tie" is inside the
+   noise band at 1310 positives; the field uses coverage/effort curves and
+   recall@K with CIs (workstream A1, next after the speed bundle).
+2. **EPSS version staleness** — all claims are vs v3/v4 history; EPSS v5
+   (2026-06-15) must be named in claims and re-tested when history accumulates.
+3. **Label count is still the binding constraint** — ~396 true in-wild events;
+   the only statistics-approved PR-AUC lever is more labels (L1: Vulnrichment
+   SSVC git history, timestamped `active` transitions, backfill to mid-2024).
+4. **No hyperparameter search / single seed everywhere** — the +0.100 AUC win
+   has no seed-variance estimate yet (A3).
+5. **Top-of-list precision** — EPSS still wins recall@top-1%; LambdaRank
+   top-push (A2) targets exactly that band.
+6. **IPCW c-index computed per origin but never aggregated** — a known
+   reporting gap (A1).
+7. **Speed bundle in flight** — backtest merge hoist, cached landmark-EPSS
+   loader, early stopping, parallel hill-climb (Tasks 3–6 of the plan).
 
 ## Investigation phase (done)
 
