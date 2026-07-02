@@ -53,7 +53,8 @@ Rules of engagement for this effort:
 | Hill-climb `n_workers` thread-parallel candidate evaluation (`greedy_forward_select`), `beat_epss_hillclimb.py` set to 2 workers | Each greedy round runs one full backtest per remaining candidate, serially; threads share the frames zero-copy and xgboost releases the GIL (a process pool would multiply ~1 GB RSS per worker toward the 6 GB gate) | Selection + trial order proven identical to serial (submission-order map + determinism test); wall-clock benefit realized per hill-climb run; suite 365 passed |
 | Verification gate: full-corpus identity + artifact refresh | No refactor counts without proof | Fast build: all 7 parquets frame-identical, 21.1 s/864 MB (≈ baseline — honest: the .map passes were a smaller cost share than mapped). EPSS build: all parquets identical, 4 m 05 s/1.23 GB (≈ baseline). Live `artifacts/` refreshed; **cached landmark-EPSS load: 0.23 s vs ~4 min streamed (~1000×)** for 338k rows × 12 cols |
 | RE round (2 adversarial reviewers × 5 loops, per standing rule) — **6 real breaks found and fixed** | The refactors claimed output-identical behavior; full-corpus identity can't cover out-of-corpus inputs | Fixed with regression tests: (1) CVSS `[^/]+`→`[^/]*` — empty values (`"AV:"`) silently flipped `incentive_network`/one-hot columns; (2) bytes vectors parsed where old `isinstance(str)` rejected — str-gate restored; (3) CWE crash on `None` inside the ndarray (realistic nullable `list<string>` parquet load) — `dict.fromkeys` dedup; (4) CWE silent cross-row contamination on duplicate/NaN `cve_id` — crosstab keyed by row position; (5) cache could serve wrong values under published-date drift between corpora (62 drifted ids exist between handover and merged corpora TODAY) — `published` now stamped into the artifact and exact-matched, None-snapshot hits refused; (6) `validation="random"` could steal ≤5 (even the only) events into validation — fit keeps ≥1 event. Plus: plural `load_epss_at_landmarks` (miss-path had regressed to 2 scans instead of 1 fused — reviewer caught it), loud guards for silently-ignored `model_kwargs`, CPU-fallback warning in xgb, `n_skipped_origins` surfaced in backtest results. HOLDS verdicts: backtest hoist (empirical filter/prepare commutation), thread-parallel hill-climb (byte-identical at 4–8 threads, <1 GB VRAM of 8 GB) |
-| Process note: the verification gate caught my own artifact-refresh mistake | The first refresh omitted `--technique-chain`, silently dropping the attack-feature columns; the backtest identity re-check flagged non-identical metrics immediately | Artifacts rebuilt with the full original flag set; identity re-verified after rebuild. This is why every step re-runs the gate |
+| Process note: the verification gate caught my own artifact-refresh mistake | The first refresh omitted `--technique-chain`, silently dropping the attack-feature columns; the backtest identity re-check flagged non-identical metrics immediately | Artifacts rebuilt with the full original flag set (81 feature cols: 12 attack, 3 EPSS; 4 m 22 s / 1.46 GB). This is why every step re-runs the gate |
+| Final state (2026-07-03, branch merged) | — | Hardened cache: **plural load 0.57 s vs ~4 min streamed (~450×)** under the published-guard. New backtest reference on refreshed 81-col artifacts (handover labels, 396 events): AUC@30 0.693 / AUC@90 0.724, 36.4 s / 1.15 GB, 14 origins + **1 threshold-skip now visible** via `n_skipped_origins`. Note: the 81-col set supersedes the 72-col 2026-06-12 artifacts (adds incentive flags + `published` in landmark files); like-for-like identity claims all compared same inputs and stand |
 
 ## What's better than before — and where it can still improve
 
@@ -94,8 +95,10 @@ decision-quality (measured framing, evidence-based rejections).
    top-push (A2) targets exactly that band.
 6. **IPCW c-index computed per origin but never aggregated** — a known
    reporting gap (A1).
-7. **Speed bundle in flight** — backtest merge hoist, cached landmark-EPSS
-   loader, early stopping, parallel hill-climb (Tasks 3–6 of the plan).
+7. ~~Speed bundle in flight~~ **DONE 2026-07-03** — all six tasks landed +
+   RE-audited (6 breaks found and fixed); see §Changes landed. Remaining axes
+   are the accuracy workstreams A1–A3 and the L1 label connector (specced in
+   the design doc, not started).
 
 ## Investigation phase (done)
 
