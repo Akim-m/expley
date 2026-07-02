@@ -79,7 +79,8 @@ unchanged on a fixture; measured speedup; peak RSS under gate.
 Add the field-standard idiom: coverage/efficiency (effort) curves, recall@K,
 bootstrap CIs for PR-AUC (Boyd 2013); aggregate the per-origin IPCW c-index
 that is currently computed but never reported; stamp the EPSS version
-(v3/v4 history; v5 shipped 2026-06-15) in artifacts and README claims.
+(v3/v4 history; v4 live 2025-03-17 — a "v5 shipped 2026-06-15" survey claim did
+not verify against FIRST's site, RE audit 2026-07-03) in artifacts and README claims.
 **Accept:** parity artifact + README carry the new metrics with CIs; the
 "PR-AUC tied" claim restated with its noise band.
 

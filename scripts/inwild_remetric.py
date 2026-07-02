@@ -28,7 +28,11 @@ from temporal_exploit.cli import (
     in_wild_clock_start,
     load_optional_event,
 )
-from temporal_exploit.effort_metrics import pooled_bootstrap_pr_auc, recall_by_frac_deltas
+from temporal_exploit.effort_metrics import (
+    paired_pooled_ap_delta,
+    pooled_bootstrap_pr_auc,
+    recall_by_frac_deltas,
+)
 from temporal_exploit.epss_features import epss_feature_columns
 from temporal_exploit.loaders import load_parquet
 
@@ -40,9 +44,12 @@ EFFORT_GRID = (0.005, 0.01, 0.02, 0.05, 0.10, 0.15, 0.20, 0.30)
 CURVE_HORIZONS = (30, 90)
 MODEL = "xgb"
 EPSS_VERSION_NOTE = (
-    "EPSS scores come from the local epss_history file (v3/v4-era through the "
-    "2026-03-14 snapshot); EPSS v5 (released 2026-06-15) is NOT in this history — "
-    "every comparison here is versus pre-v5 EPSS."
+    "EPSS scores come from the local epss_history file, which ends at the "
+    "2026-03-14 snapshot: v3/v4-era scores (v4 went live 2025-03-17 per "
+    "first.org/epss/model). Any later FIRST model revision is out of scope of "
+    "this history — comparisons are versus v3/v4-era EPSS. (An earlier 'v5 "
+    "shipped 2026-06-15' claim did NOT verify against FIRST's site — RE audit "
+    "2026-07-03.)"
 )
 
 corpus = load_parquet(OUT_DIR, "cve_corpus", columns=["cve_id", "published"])
@@ -86,17 +93,22 @@ epss_arm = rolling_origin_backtest(
 )
 
 
-def pooled_pr_auc(res, horizon):
-    """Pooled PR-AUC + stratified bootstrap CI over the horizon subcohort
-    (drop rows censored before h — the evaluator's 'known' semantics)."""
+def _pooled(res, horizon):
     risk, dur, obs = [], [], []
     for o in res["per_origin"]:
         s = o["scores"]
         risk += s["risk"]; dur += s["duration_days"]; obs += s["event_observed"]
     risk = np.asarray(risk); dur = np.asarray(dur); obs = np.asarray(obs, bool)
-    known = (dur > horizon) | obs
+    # evaluator's 'known' semantics exactly: censored-at-h rows stay as
+    # negatives (>= not > — RE audit boundary fix, 332 rows @30)
+    known = (dur >= horizon) | obs
     y = obs & (dur <= horizon)
-    return pooled_bootstrap_pr_auc(y[known], risk[known], n_boot=1000, seed=0)
+    return y[known], risk[known]
+
+
+def pooled_pr_auc(res, horizon):
+    y, risk = _pooled(res, horizon)
+    return pooled_bootstrap_pr_auc(y, risk, n_boot=1000, seed=0)
 
 
 def curve(res, horizon):
@@ -123,6 +135,14 @@ out = {
     "pooled_pr_auc": {
         str(h): {"structural": pooled_pr_auc(structural, h),
                  "epss_score": pooled_pr_auc(epss_arm, h)}
+        for h in CURVE_HORIZONS
+    },
+    # THE significance statement (RE audit): paired resamples on identical rows
+    "paired_pooled_ap_delta_structural_minus_epss": {
+        str(h): paired_pooled_ap_delta(
+            _pooled(structural, h)[0], _pooled(structural, h)[1],
+            _pooled(epss_arm, h)[1], n_boot=1000, seed=0,
+        )
         for h in CURVE_HORIZONS
     },
     "paired_pr_auc_origin_deltas": {
@@ -155,7 +175,7 @@ for ax, h in zip(axes, CURVE_HORIZONS):
     ax.plot(xs, [ce["structural"][f] for f in EFFORT_GRID], "o-",
             color="#1a3a5c", label="structural (EPSS-free)")
     ax.plot(xs, [ce["epss_score"][f] for f in EFFORT_GRID], "s--",
-            color="#c0392b", label="raw EPSS score")
+            color="#c0392b", label="raw EPSS percentile")
     ax.set_title(f"coverage vs effort — {h}d horizon")
     ax.set_xlabel("effort: top-% of list triaged")
     ax.set_xscale("log")
@@ -170,9 +190,12 @@ print("wrote docs/figures/fig_coverage_effort.png", flush=True)
 # ------------------------------------------------------------------ verdict
 for h in CURVE_HORIZONS:
     pp = out["pooled_pr_auc"][str(h)]
+    pd_ = out["paired_pooled_ap_delta_structural_minus_epss"][str(h)]
     print(f"\nh={h}d pooled PR-AUC: structural {pp['structural']['pr_auc']:.4f} "
           f"{pp['structural']['ci95']} vs EPSS {pp['epss_score']['pr_auc']:.4f} "
-          f"{pp['epss_score']['ci95']}")
+          f"{pp['epss_score']['ci95']} (n_pos={pp['structural']['n_pos']})")
+    print(f"  PAIRED delta: {pd_['delta_ap']:+.5f} ci={pd_['ci95']} "
+          f"frac_pos={pd_['frac_positive']:.3f}")
     for f in (0.01, 0.05, 0.10):
         d = out["coverage_effort"][str(h)]["paired_deltas"][f"{f:g}"]
         print(f"  coverage@{f:.0%}: Δ{d['mean_delta']:+.3f} ci95={d['ci95']} win={d['win_frac']:.2f}")

@@ -1,7 +1,26 @@
 """A1 re-metric, Task 2: pooled bootstrap PR-AUC CIs + recall-by-frac paired deltas."""
 import numpy as np
 
-from temporal_exploit.effort_metrics import pooled_bootstrap_pr_auc, recall_by_frac_deltas
+from temporal_exploit.effort_metrics import (
+    paired_pooled_ap_delta,
+    pooled_bootstrap_pr_auc,
+    recall_by_frac_deltas,
+)
+
+
+def test_paired_pooled_ap_delta_detects_better_arm():
+    rng = np.random.default_rng(2)
+    y = np.zeros(2000, dtype=bool)
+    y[rng.choice(2000, 40, replace=False)] = True
+    good = y * 1.0 + rng.normal(scale=0.3, size=2000)   # informative
+    bad = rng.random(2000)                               # random
+    d = paired_pooled_ap_delta(y, good, bad, n_boot=200, seed=0)
+    assert d["delta_ap"] > 0.2
+    assert d["ci95"][0] > 0 and d["frac_positive"] > 0.99
+    # symmetric: swapping arms flips the sign
+    d2 = paired_pooled_ap_delta(y, bad, good, n_boot=200, seed=0)
+    assert d2["delta_ap"] < 0 and d2["ci95"][1] < 0
+    assert paired_pooled_ap_delta(np.zeros(10, bool), good[:10], bad[:10]) is None
 
 
 def test_pooled_bootstrap_pr_auc_perfect_ranker():

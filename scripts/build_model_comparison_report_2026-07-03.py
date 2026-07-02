@@ -308,8 +308,7 @@ story.append(Paragraph(
     "sharper timing), not model-limited — proven by exhausting the model space above. "
     "<b>5.</b> Next levers (specced 2026-07-03): re-metric to coverage/effort + recall@K with "
     "CIs; LambdaRank top-push; multi-seed + bounded tuning; Vulnrichment SSVC git-history "
-    "labels — the one lever statistics says can move PR-AUC. EPSS-version caveat: all numbers "
-    "above are vs EPSS v3/v4 history; EPSS v5 shipped 2026-06-15.", BODY))
+    "labels — the one lever statistics says can move PR-AUC. EPSS-version caveat: all numbers above are vs v3/v4-era history (v4 live 2025-03-17); an earlier 'v5 shipped 2026-06-15' claim did not verify (RE 2026-07-03).", BODY))
 story.append(Spacer(1, 2 * mm))
 story.append(Paragraph(
     "Build: scripts/build_model_comparison_report_2026-07-03.py · sources: artifacts/*.json + "
