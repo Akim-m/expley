@@ -21,7 +21,7 @@ from temporal_exploit.cli import (
     in_wild_clock_start,
     load_optional_event,
 )
-from temporal_exploit.landmark import load_epss_at_landmark
+from temporal_exploit.landmark import load_epss_at_landmarks
 from temporal_exploit.loaders import load_parquet
 
 OUT_DIR = Path("dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out")
@@ -44,11 +44,10 @@ for source, (parquet_name, date_col) in EVENT_SOURCES.items():
 print(f"in-wild sources={sorted(event_frames)}", flush=True)
 
 features_pub = pd.read_parquet(f"{ARTIFACT_DIR}/publication_features.parquet")
-print(f"loading EPSS landmark trajectory for L={LANDMARKS} (cache: artifacts/, else stream) ...", flush=True)
-epss = {
-    L: load_epss_at_landmark(corpus, EPSS_PATH, L, snapshot_date=SNAPSHOT, artifact_dir="artifacts")
-    for L in LANDMARKS
-}
+print(f"loading EPSS landmark trajectory for L={LANDMARKS} (cache: artifacts/, else ONE fused scan) ...", flush=True)
+epss = load_epss_at_landmarks(
+    corpus, EPSS_PATH, LANDMARKS, snapshot_date=SNAPSHOT, artifact_dir="artifacts"
+)
 origins = make_origins(SNAPSHOT, START, min_followup_days=180)
 clock_start = in_wild_clock_start(tuple(event_frames))
 

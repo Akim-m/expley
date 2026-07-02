@@ -63,6 +63,51 @@ def test_incentive_values_unchanged():
     assert feats.loc[3, "incentive_network"] == 1   # AV last-occurrence = N
 
 
+def test_parse_empty_value_bytes_and_colon_values_match_old_semantics():
+    # RE-audit regressions (2026-07-03): the old split(":", 1) dict parse kept
+    # empty values, rejected bytes, and allowed ':' inside values.
+    vec = pd.Series([
+        "CVSS:3.1/AV:",                              # empty value -> kept as ""
+        "CVSS:3.1/AV:N/AV:",                         # dup key, last EMPTY wins
+        b"CVSS:3.1/AV:N/PR:N/UI:N/AC:L/C:H",         # bytes -> not str -> no parse
+        "UI:AV:N",                                   # ':' in value; AV is NOT a key here
+    ])
+    parsed = parse_cvss_vectors(vec)
+    assert parsed.loc[0, "AV"] == ""
+    assert parsed.loc[1, "AV"] == ""
+    assert all(v is None for v in parsed.loc[2])
+    assert parsed.loc[3, "UI"] == "AV:N" and parsed.loc[3, "AV"] is None
+
+
+def test_cwe_null_in_list_duplicate_and_nan_cve_id():
+    # RE-audit regressions (2026-07-03): None inside the ndarray must not crash
+    # (nullable list<string> parquet loads exactly like this); duplicate cve_id
+    # rows must keep per-ROW membership (no cross-row contamination).
+    corpus = _corpus()
+    corpus.at[0, "cwe_ids"] = np.array(["CWE-79", None], dtype=object)
+    feats = build_publication_features(corpus, top_k_cwes=2)
+    assert feats["cwe_CWE-79"].tolist() == [1, 0, 0, 1]
+
+    dup = pd.concat([corpus, corpus.iloc[[0]]], ignore_index=True)
+    cwe_col = list(dup["cwe_ids"])                    # .at unpacks 1-elem arrays; go via list
+    cwe_col[4] = np.array(["CWE-89"])                 # second CVE-1 row, different CWE
+    dup["cwe_ids"] = pd.Series(cwe_col, dtype=object)
+    feats_dup = build_publication_features(dup, top_k_cwes=2)
+    assert feats_dup["cwe_CWE-89"].tolist() == [0, 0, 0, 1, 1]   # row 0 NOT contaminated
+    assert feats_dup["cwe_CWE-79"].tolist() == [1, 0, 0, 1, 0]   # row 4 NOT contaminated
+
+
+def test_parsed_vectors_index_mismatch_raises():
+    corpus = _corpus()
+    parsed = parse_cvss_vectors(corpus["cvss_v3_vector"])          # index 0..3
+    shifted = corpus.set_index(pd.Index([10, 11, 12, 13]))         # different index
+    import pytest
+    with pytest.raises(ValueError, match="index"):
+        build_incentive_features(shifted, parsed_vectors=parsed)
+    with pytest.raises(ValueError, match="index"):
+        build_publication_features(shifted, parsed_vectors=parsed)
+
+
 def test_cwe_topk_columns_and_values():
     corpus = _corpus()
     feats = build_publication_features(corpus, top_k_cwes=2)

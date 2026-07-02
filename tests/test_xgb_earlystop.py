@@ -46,6 +46,18 @@ def test_unknown_validation_mode_raises():
         fit_xgb_aft(_frame(), early_stopping_rounds=10, validation="bogus")
 
 
+def test_lone_event_stays_in_fit_frame():
+    # RE audit: with <=5 events the val split could steal up to ALL of them
+    # from training (n=1 -> pure-censored AFT fit, silently degenerate).
+    frame = _frame(n=120)
+    frame["event_observed"] = 0
+    frame.loc[0, "event_observed"] = 1            # exactly one event
+    frame.loc[0, "duration_days"] = 15.0
+    m = fit_xgb_aft(frame, num_rounds=30, early_stopping_rounds=5, validation="random")
+    risk = m.risk_scores(frame)
+    assert np.isfinite(risk).all()                # trains; event kept in fit
+
+
 def test_no_early_stopping_ignores_validation_mode():
     # early_stopping_rounds=None -> validation mode irrelevant, trains all rounds
     m = fit_xgb_aft(_frame(), num_rounds=20)
