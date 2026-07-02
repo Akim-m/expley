@@ -43,8 +43,62 @@ Rules of engagement for this effort:
 
 ## Changes landed
 
-_(none yet — investigation phase; entries below move up here as they land,
-each with before/after numbers)_
+| Change | Why | Measured effect |
+|---|---|---|
+| Shared vectorized CVSS parse — `parse_cvss_vectors` (one `str.extract` pass per metric), consumed by `build_publication_features`, `build_incentive_features`, and the build CLI (branch `speed-memory-bundle`) | The same vector string was parsed twice (per-row dict `.map` in features.py, again in incentive_features.py + 8 more `.map` passes); one vectorized parse feeds both builders | Outputs pinned identical by tests (duplicate-key last-wins, missing→None, 'S' vs 'CVSS:' prefix); wall-clock delta measured at Task 7 rebuild; suite 350 passed |
+| CWE top-k membership via one `explode`+`crosstab` (was one `.map` pass per top-k CWE — 20 passes × 360k rows) | Membership testing was the last multi-pass Python loop in the publication feature builder | Set semantics (per-CVE dedup) and (-count, name) ranking pinned by test; explode needs `reset_index` (crosstab rejects duplicate labels — caught by the test, not in prod); suite 350 passed |
+| Cached landmark-EPSS loader `landmark.load_epss_at_landmark` (guards: snapshot match, trajectory columns present, corpus coverage; else streams) + repointed `operating_points.py` / `inwild_epss_ablation_landmark.py` | Both scripts re-streamed the whole 375M-row file (~4 min each) although build-dataset already persists the identical bundle; stale 2026-06-12 artifacts lack the trajectory columns so a column guard is mandatory | 6 loader tests incl. corpus-order alignment + 4 fallback modes; cache benefit becomes real after the Task 7 artifact refresh (~4 min → seconds per script); suite 356 passed |
+| Backtest hoist: `validate_feature_matrix` once + final-snapshot test frame prepared once, per-origin test sets are boolean slices; train side skips the redundant per-call NaN scan | Two full ~360k-row `prepare_modeling_frame` calls per origin × 15 origins re-did the same merge + NaN scan + downcast | 15-origin in-wild xgb backtest: **38.5 s → 35.15 s (−8.7%)**, RSS 1.03 → 1.06 GB (hoisted frame, 18% of gate); report values bit-identical to baseline (0 change/delete diff hunks; add-only hunks are the parity PR's multi-k field, not this change); suite 359 passed |
+| XGB `validation="random"` (event-stratified 10% early-stop split) + `model_kwargs` plumbed through `rolling_origin_backtest` — **shipped opt-in, adoption REJECTED for the headline config** | The tail split is documented to underfit; a representative-event-rate split was the hypothesis for making early stopping usable | Measured A/B (15 origins, in-wild): 25% faster (32.8→24.5 s) but significantly worse ranking — AUC@30 −0.043 [−0.081,−0.006], AUC@90 −0.043 [−0.066,−0.021]. Root cause: ~99.5% censoring leaves tens of val events per origin → noisy aft-nloglik stops boosting early. Defaults unchanged (500 rounds, no early stop); negative result feeds A3 (tune rounds on train-era origins with the real metric instead). `artifacts/xgb_earlystop_ab.json` |
+| Hill-climb `n_workers` thread-parallel candidate evaluation (`greedy_forward_select`), `beat_epss_hillclimb.py` set to 2 workers | Each greedy round runs one full backtest per remaining candidate, serially; threads share the frames zero-copy and xgboost releases the GIL (a process pool would multiply ~1 GB RSS per worker toward the 6 GB gate) | Selection + trial order proven identical to serial (submission-order map + determinism test); wall-clock benefit realized per hill-climb run; suite 365 passed |
+| Verification gate: full-corpus identity + artifact refresh | No refactor counts without proof | Fast build: all 7 parquets frame-identical, 21.1 s/864 MB (≈ baseline — honest: the .map passes were a smaller cost share than mapped). EPSS build: all parquets identical, 4 m 05 s/1.23 GB (≈ baseline). Live `artifacts/` refreshed; **cached landmark-EPSS load: 0.23 s vs ~4 min streamed (~1000×)** for 338k rows × 12 cols |
+| RE round (2 adversarial reviewers × 5 loops, per standing rule) — **6 real breaks found and fixed** | The refactors claimed output-identical behavior; full-corpus identity can't cover out-of-corpus inputs | Fixed with regression tests: (1) CVSS `[^/]+`→`[^/]*` — empty values (`"AV:"`) silently flipped `incentive_network`/one-hot columns; (2) bytes vectors parsed where old `isinstance(str)` rejected — str-gate restored; (3) CWE crash on `None` inside the ndarray (realistic nullable `list<string>` parquet load) — `dict.fromkeys` dedup; (4) CWE silent cross-row contamination on duplicate/NaN `cve_id` — crosstab keyed by row position; (5) cache could serve wrong values under published-date drift between corpora (62 drifted ids exist between handover and merged corpora TODAY) — `published` now stamped into the artifact and exact-matched, None-snapshot hits refused; (6) `validation="random"` could steal ≤5 (even the only) events into validation — fit keeps ≥1 event. Plus: plural `load_epss_at_landmarks` (miss-path had regressed to 2 scans instead of 1 fused — reviewer caught it), loud guards for silently-ignored `model_kwargs`, CPU-fallback warning in xgb, `n_skipped_origins` surfaced in backtest results. HOLDS verdicts: backtest hoist (empirical filter/prepare commutation), thread-parallel hill-climb (byte-identical at 4–8 threads, <1 GB VRAM of 8 GB) |
+| Process note: the verification gate caught my own artifact-refresh mistake | The first refresh omitted `--technique-chain`, silently dropping the attack-feature columns; the backtest identity re-check flagged non-identical metrics immediately | Artifacts rebuilt with the full original flag set (81 feature cols: 12 attack, 3 EPSS; 4 m 22 s / 1.46 GB). This is why every step re-runs the gate |
+| Final state (2026-07-03, branch merged) | — | Hardened cache: **plural load 0.57 s vs ~4 min streamed (~450×)** under the published-guard. New backtest reference on refreshed 81-col artifacts (handover labels, 396 events): AUC@30 0.693 / AUC@90 0.724, 36.4 s / 1.15 GB, 14 origins + **1 threshold-skip now visible** via `n_skipped_origins`. Note: the 81-col set supersedes the 72-col 2026-06-12 artifacts (adds incentive flags + `published` in landmark files); like-for-like identity claims all compared same inputs and stand |
+
+## What's better than before — and where it can still improve
+
+Updated as work lands (user request 2026-07-03). "Model" here = the whole
+modeling pipeline; the in-wild ranking model itself is unchanged so far — the
+current wins are pipeline-level (correctness-preserving speed/memory work) and
+decision-quality (measured framing, evidence-based rejections).
+
+**Better than the old state:**
+
+1. **Every performance claim is now measured, not asserted** — recorded
+   `/usr/bin/time -v` baselines for all four pipeline paths (build 21.3 s/858 MB,
+   EPSS build 4 m 13 s/1.21 GB, backtest 38.5 s/1.03 GB, suite 1 m 47 s/613 MB);
+   the old state had scattered per-fix numbers but no whole-pipeline scoreboard.
+2. **The EPSS-comparison methodology is locked clean** — no EPSS data in
+   training (directive + measured support: EPSS features *hurt* XGB-AFT,
+   −0.114 AUC@30), raw-score-only baseline arm. The old ablations had a
+   model-wrapped EPSS arm that overstated the margin.
+3. **A validated do-not-do list** — focal/SMOTE/deep-swaps/TabPFN/LLM-embeddings/
+   GNN/polars/external-memory each rejected with a citable negative result at
+   our scale, so future sessions don't burn time re-testing fashions.
+4. **CVSS parsing does one vectorized pass instead of ~10 per-row passes**
+   (Task 1, landed) — same outputs, pinned by tests.
+
+**Where it can still improve (honest list):**
+
+1. **The headline metric is the wrong idiom** — PR-AUC@30 "tie" is inside the
+   noise band at 1310 positives; the field uses coverage/effort curves and
+   recall@K with CIs (workstream A1, next after the speed bundle).
+2. **EPSS version staleness** — all claims are vs v3/v4 history; EPSS v5
+   (2026-06-15) must be named in claims and re-tested when history accumulates.
+3. **Label count is still the binding constraint** — ~396 true in-wild events;
+   the only statistics-approved PR-AUC lever is more labels (L1: Vulnrichment
+   SSVC git history, timestamped `active` transitions, backfill to mid-2024).
+4. **No hyperparameter search / single seed everywhere** — the +0.100 AUC win
+   has no seed-variance estimate yet (A3).
+5. **Top-of-list precision** — EPSS still wins recall@top-1%; LambdaRank
+   top-push (A2) targets exactly that band.
+6. **IPCW c-index computed per origin but never aggregated** — a known
+   reporting gap (A1).
+7. ~~Speed bundle in flight~~ **DONE 2026-07-03** — all six tasks landed +
+   RE-audited (6 breaks found and fixed); see §Changes landed. Remaining axes
+   are the accuracy workstreams A1–A3 and the L1 label connector (specced in
+   the design doc, not started).
 
 ## Investigation phase (done)
 
