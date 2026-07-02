@@ -46,6 +46,7 @@ Rules of engagement for this effort:
 | Change | Why | Measured effect |
 |---|---|---|
 | Shared vectorized CVSS parse — `parse_cvss_vectors` (one `str.extract` pass per metric), consumed by `build_publication_features`, `build_incentive_features`, and the build CLI (branch `speed-memory-bundle`) | The same vector string was parsed twice (per-row dict `.map` in features.py, again in incentive_features.py + 8 more `.map` passes); one vectorized parse feeds both builders | Outputs pinned identical by tests (duplicate-key last-wins, missing→None, 'S' vs 'CVSS:' prefix); wall-clock delta measured at Task 7 rebuild; suite 350 passed |
+| CWE top-k membership via one `explode`+`crosstab` (was one `.map` pass per top-k CWE — 20 passes × 360k rows) | Membership testing was the last multi-pass Python loop in the publication feature builder | Set semantics (per-CVE dedup) and (-count, name) ranking pinned by test; explode needs `reset_index` (crosstab rejects duplicate labels — caught by the test, not in prod); suite 350 passed |
 
 ## What's better than before — and where it can still improve
 
