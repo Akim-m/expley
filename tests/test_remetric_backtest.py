@@ -44,3 +44,25 @@ def test_top_fracs_passthrough_and_ipcw_aggregate():
     assert set(agg) >= {"mean", "median", "sd", "n", "caveat"}
     assert "censoring" in agg["caveat"]  # the mandatory degenerate-weights caveat
     assert 0.0 < agg["mean"] < 1.0
+
+
+def test_keep_scores_exposes_pooled_rows():
+    corpus, event_frames, features = _world()
+    res = rolling_origin_backtest(
+        corpus, event_frames, features, snapshot_date="2024-06-01",
+        origins=["2022-07-01", "2023-01-01"], model="cox", label_set="in_wild",
+        horizons=(30, 90), min_train=50, min_train_events=10, min_test=20,
+        keep_scores=True,
+    )
+    for o in res["per_origin"]:
+        s = o["scores"]
+        n = o["n_test"]
+        assert len(s["risk"]) == len(s["duration_days"]) == len(s["event_observed"]) == n
+        assert np.isfinite(np.asarray(s["risk"], float)).all()
+    # default stays lean: no scores key without the flag
+    res2 = rolling_origin_backtest(
+        corpus, event_frames, features, snapshot_date="2024-06-01",
+        origins=["2022-07-01"], model="cox", label_set="in_wild",
+        horizons=(30,), min_train=50, min_train_events=10, min_test=20,
+    )
+    assert all("scores" not in o for o in res2["per_origin"])
