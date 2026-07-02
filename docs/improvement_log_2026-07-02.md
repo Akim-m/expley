@@ -117,6 +117,12 @@ decision-quality (measured framing, evidence-based rejections).
    are the accuracy workstreams A1–A3 and the L1 label connector (specced in
    the design doc, not started).
 
+## A1 re-metric workstream (in progress, 2026-07-03)
+
+| Change | Why | Measured effect |
+|---|---|---|
+| `top_fracs` passthrough in `rolling_origin_backtest` + per-origin `c_index_ipcw` stored and aggregated with a mandatory caveat | A1: coverage/effort curves need a dense effort grid; the IPCW c-index was computed every origin and thrown away (known reporting gap) — but train/test censoring regimes differ across the origin split, so it aggregates as SECONDARY only | Test-pinned; suite 374 passed |
+
 ## Investigation phase (done)
 
 | What was done | Why |
