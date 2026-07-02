@@ -74,6 +74,9 @@ def main() -> None:
     result = greedy_forward_select(
         candidate_groups=candidates, incumbent_groups=["epss"],
         evaluate=evaluate, paired_delta=paired_delta,
+        # 2 threads: xgboost releases the GIL; frames shared zero-copy
+        # (a process pool would multiply the ~1 GB working set per worker)
+        n_workers=2,
     )
     dt = time.time() - t0
 
