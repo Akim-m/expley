@@ -47,6 +47,28 @@ def test_parser_handles_split_lines_deletes_and_noise():
     assert got == {"CVE-2024-2222": {"active": "2024-05-05T00:00:00+00:00"}}
 
 
+def test_parser_normalizes_capitalized_values():
+    # The real cisagov/vulnrichment history carries a handful of capitalized
+    # typos ("Active"/"PoC"/"None") alongside the lowercase norm; they must be
+    # matched and normalized to lowercase, not silently dropped. An earlier
+    # lowercase "poc" must still win over a later capitalized "PoC" re-add.
+    lines = _log(
+        f"{COMMIT_SENTINEL}2024-05-08T10:04:10-04:00",
+        "+++ b/2015/2xxx/CVE-2015-2051.json",
+        '+                    "Exploitation": "Active"',   # capitalized in-wild label
+        f"{COMMIT_SENTINEL}2024-06-01T00:00:00+00:00",
+        "+++ b/2015/2xxx/CVE-2015-2051.json",
+        '+                    "Exploitation": "PoC"',       # later, must NOT overwrite active
+        f"{COMMIT_SENTINEL}2024-04-01T00:00:00+00:00",     # earlier commit (order preserved by miner)
+        "+++ b/2015/9xxx/CVE-2015-9999.json",
+        '+                    "Exploitation": "None"',      # capitalized none -> normalized, then dropped by frame
+    )
+    got = parse_ssvc_transitions(lines)
+    assert got["CVE-2015-2051"]["active"] == "2024-05-08T10:04:10-04:00"
+    assert got["CVE-2015-2051"]["poc"] == "2024-06-01T00:00:00+00:00"
+    assert got["CVE-2015-9999"] == {"none": "2024-04-01T00:00:00+00:00"}
+
+
 def test_transitions_to_frame_contract():
     frame = transitions_to_frame({
         "CVE-2024-1111": {"poc": "2024-07-01T10:00:00+00:00",
