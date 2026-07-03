@@ -8,7 +8,8 @@ then reports what the field actually uses (EPSS/FIRST/Coalition idiom):
   - POOLED stratified-bootstrap PR-AUC CIs per arm (Boyd 2013) — the noise
     band the "PR-AUC tied" claim lives inside;
   - the aggregated (caveated, secondary) IPCW c-index per arm;
-  - an explicit EPSS-version stamp (history file predates EPSS v5, 2026-06-15).
+  - an explicit EPSS-version stamp (v3/v4-era history; a 'v5' survey claim did
+    not verify — RE audit 2026-07-03).
 Outputs artifacts/inwild_remetric.json + docs/figures/fig_coverage_effort.png.
 """
 import json
@@ -182,7 +183,7 @@ for ax, h in zip(axes, CURVE_HORIZONS):
     ax.grid(alpha=0.3)
 axes[0].set_ylabel("coverage: share of within-h exploited CVEs caught")
 axes[0].legend(loc="upper left", fontsize=8)
-fig.suptitle("In-wild coverage/effort curves (15-origin walk-forward; pre-v5 EPSS)", fontsize=10)
+fig.suptitle("In-wild coverage/effort curves (15-origin walk-forward; v3/v4-era EPSS)", fontsize=10)
 fig.tight_layout()
 fig.savefig("docs/figures/fig_coverage_effort.png", dpi=150)
 print("wrote docs/figures/fig_coverage_effort.png", flush=True)

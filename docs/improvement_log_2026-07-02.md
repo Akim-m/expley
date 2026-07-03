@@ -57,6 +57,12 @@ Rules of engagement for this effort:
 | All-models comparison report (`docs/model_comparison_report_2026-07-03.pdf`, generator `scripts/build_model_comparison_report_2026-07-03.py`) | User request: one report comparing every model family tried, with regime and verdict; numbers read LIVE from artifacts at build time, doc-cited numbers labelled | 2-page PDF: 5 tables (in-wild families incl. XGB-AFT scale-flip row, EPSS-baseline arms, first-weap at scale, competing-risks/deep + PoC→KEV head, config variants) + standing verdicts. RE round (2 verifiers, 6 loops total, 41 number checks): 1 BLOCKER (recal row conflated Booth baseline-refit artifact with the cross-fit temperature experiment), 3 WRONG (hand-typed DeepHit CIF row → now a live read; "rare causes unscoreable"; "recent clean cohort" qualifier), 3 OVERSTATED ("wins every axis", PH-violation sourcing, discrimination-headline metric-dependence) — **all fixed before delivery** |
 | Final state (2026-07-03, branch merged) | — | Hardened cache: **plural load 0.57 s vs ~4 min streamed (~450×)** under the published-guard. New backtest reference on refreshed 81-col artifacts (handover labels, 396 events): AUC@30 0.693 / AUC@90 0.724, 36.4 s / 1.15 GB, 14 origins + **1 threshold-skip now visible** via `n_skipped_origins`. Note: the 81-col set supersedes the 72-col 2026-06-12 artifacts (adds incentive flags + `published` in landmark files); like-for-like identity claims all compared same inputs and stand |
 
+## Final deliverable (2026-07-03)
+
+| What | Detail |
+|---|---|
+| `docs/performance_report_2026-07-03.pdf` (generator `scripts/build_performance_report_2026-07-03.py`, authored by an Opus subagent, verified here) | 2 pages, every §1–3 number read live from artifacts at build time: headline (AUC +0.100/+0.134; **paired pooled PR-AUC win** +0.0031/+0.0057, 99.8% of replicates; ~1.8× the EPSS AP at a ~0.18% base rate), coverage/effort table + figure (crossover 1–2%, significant from 5%@90d / 10%@30d), session verdicts (A2/A3/early-stop/L1 with artifacts), pipeline health (doc-cited), standing ceiling statement + next levers. Figure title corrected to "v3/v4-era EPSS" after the v5 retraction |
+
 ## What Fable improves on itself (process self-corrections, user-requested)
 
 Mistakes the assistant made during this effort, how each was caught, and the
