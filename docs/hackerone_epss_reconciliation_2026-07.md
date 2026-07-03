@@ -33,6 +33,13 @@ in-the-wild exploitation signal that our data lacks — and does it help **vs EP
 | CWE clusters of the 37 | CWE-22, -20, -502, -306, -78, -94, -326 | traversal / deserialization / injection RCE |
 | Named blind-spot CVEs | **CVE-2017-5638 (Apache Struts / Equifax)**, 2017-10271 (WebLogic), 2017-11317 (Telerik), 2017-9841 | famous exploited RCEs EPSS cold-started in its bottom decile |
 
+![HackerOne EPSS blind-spot](figures/fig_hackerone_epss_blindspot.png)
+
+*Fig. (A) In-wild (KEV) rate by publication-time EPSS percentile: HackerOne-disclosed CVEs are
+enriched for in-wild across all bins (they are serious vulns), and in EPSS's bottom decile they run
+3.9% vs 0.45% — the ~9× blind-spot. (B) CWE mix of the 37 bottom-decile in-wild CVEs H1 flags.
+Built by `scripts/build_hackerone_figure.py`.*
+
 ## Verdict
 
 **Real and complementary to EPSS, but sparse and analysis-grade — not a modelling feature.**
