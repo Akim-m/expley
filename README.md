@@ -1,198 +1,100 @@
 # Temporal Exploit Prediction
 
-This repository contains the dataset-extraction and handover materials for a
-research project on predicting when a CVE becomes publicly weaponized.
-
-The project is not a production application. It is a data-engineering and
-research handover pack intended to support survival-analysis work over CVE
-timelines.
-
-## What this project is about
+A leakage-safe survival-analysis pipeline that predicts **when** a published CVE
+becomes publicly weaponized — a time-to-event problem, not the usual binary
+"will it be exploited" framing.
 
 Security teams already have tools that estimate whether a vulnerability is
-severe or likely to be exploited. This project focuses on a different question:
+severe or likely to be exploited. This project asks a different question:
 
-> After a CVE is published, when does public exploitation capability appear?
+> After a CVE is published, *when* does public exploitation capability appear?
 
-The dataset supports analysis across several observable weaponization signals:
+## Highlights
 
-- public proof-of-concept publication
-- Metasploit module availability
-- Nuclei template availability
-- CISA KEV inclusion
-- Google Project Zero 0-day tracking
-- daily EPSS score history
-- CVE metadata, CWE, CVSS, CPE vendor/product data
-- MITRE CWE to CAPEC to ATT&CK mappings
+- **Scale.** A reproducible dataset builder over a **338,015-CVE corpus**,
+  fusing nine security data sources; 164,761 public proof-of-concept dates and
+  1,543 confirmed in-the-wild exploitation events are observed across the
+  timeline.
+- **Nine fused sources.** NVD/CVE metadata, public PoC publication, Metasploit,
+  Nuclei, CISA KEV, Google Project Zero 0-days, daily EPSS history, and MITRE
+  CWE→CAPEC→ATT&CK chains.
+- **Correct survival methodology.** Right-censoring at a fixed snapshot date,
+  competing-risks labels for the PoC → Metasploit → Nuclei → KEV progression,
+  and Kaplan-Meier / Cox proportional-hazards baselines evaluated at 7/30/90/
+  180-day horizons.
+- **Leakage discipline.** Only publication-time-safe features are used for
+  prediction; snapshot-time feed-presence flags and post-event description text
+  are excluded. A `feature_provenance()` audit tags every feature
+  `publication_time_safe` vs `snapshot_leakage`, and splits are time-based
+  (locked train/test), never random K-fold.
+- **Data engineering.** Pluggable live-fetch connectors (CISA KEV, FIRST.org
+  EPSS, NVD 2.0 API) and a 3.9 GB / 375M-row EPSS history processed via Arrow
+  predicate pushdown. Covered by 18 pytest modules run under warnings-as-errors.
 
-The intended modeling frame is survival analysis / time-to-event prediction.
-The strongest framing is "timeline to public weaponization", not simply
-"real-world exploitation prediction", because most available events are public
-PoC or tooling signals rather than confirmed in-the-wild exploitation.
+## Tech stack
+
+Python (packaged `src/` layout, `pyproject.toml`, console script) · pandas ·
+pyarrow (predicate pushdown) · lifelines (Kaplan-Meier, Cox PH) · pytest.
+
+## Why timeline, not just "exploited?"
+
+Most observable events are public PoC or tooling signals rather than confirmed
+in-the-wild exploitation, so the strongest, most honest framing is **timeline
+to public weaponization**. This complements EPSS rather than competing with it:
+EPSS predicts exploitation probability in a fixed 30-day window, while this
+project models weaponization *timing* and can surface CVEs where EPSS is high
+but weaponization is slow (or low but fast).
+
+## Methodology (summary)
+
+1. **Stabilize the handover data** — confirm the nine parquet sources, keep
+   generated multi-GB data out of Git, document provenance, bias, and leakage
+   risk per source.
+2. **Build the analysis dataset** — `cve_corpus.parquet` as the per-CVE base
+   table, `published` as the clock origin, joined to dated event sources; define
+   time-to-event labels and right-censor CVEs with no observed event.
+3. **Avoid temporal leakage** — publication-time features only; exclude
+   snapshot-time feed flags and post-event description text; time-based splits.
+4. **Exploratory analysis** — Kaplan-Meier curves per event definition; timing
+   by CVSS severity, CWE class, vendor/product, and ATT&CK tactic; quantify
+   censoring and PoC dominance.
+5. **Baseline survival models** — Kaplan-Meier references, Cox PH, random
+   survival forest; evaluate discrimination and calibration at fixed horizons.
+6. **Stronger models (optional)** — DeepSurv / DeepHit and competing-risk /
+   multi-state models for the PoC→Metasploit→Nuclei→KEV progression.
+7. **Reconcile against EPSS** — compare multi-horizon predictions; frame EPSS as
+   complementary.
+8. **Final outputs** — a reproducible dataset builder, locked train/test CVE-ID
+   splits, survival notebooks, evaluation tables, and a written methodology
+   covering censoring, leakage, event definitions, and source bias.
+
+## Modeling quick start
+
+```bash
+python -m pip install -e ".[dev]"
+temporal-exploit build-dataset \
+  --out-dir dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out \
+  --artifact-dir artifacts \
+  --snapshot-date 2026-03-14
+pytest
+```
+
+Generated artifacts land in `artifacts/` (Git-ignored): `modeling_labels.parquet`,
+`publication_features.parquet`, and `manifest.json`. Full methodology is in
+`docs/modeling_methodology.md`.
 
 ## Repository layout
 
 ```text
-dataset_extraction-20260608T210903Z-3-002/
-  dataset_extraction/
-    extract/                  Mongo/VRS extraction scripts
-    enrich/                   external timestamp and metadata enrichment
-    handover/                 student-facing data dictionary
-    out/                      generated parquet outputs, ignored by Git
-    README.md                 operator notes for rebuilding the handover pack
-    temporal_exploit_prediction.md
-    run_pipeline.sh
-    view_parquet.py
-    compare_outputs.py
-    requirements.txt
+dataset_extraction-.../dataset_extraction/
+  extract/     Mongo/VRS extraction scripts
+  enrich/      external timestamp and metadata enrichment
+  handover/    data dictionary
+  out/         generated parquet outputs (Git-ignored)
+src/           packaged pipeline: fetch/, labels.py, features.py, splits.py,
+               baselines.py, evaluate.py, epss_features.py, attack_features.py
+docs/          modeling_methodology.md
 ```
 
-Large generated datasets are intentionally ignored by Git. They should be
-handled as local artifacts, object-storage artifacts, or separate release files.
-
-## Current source-control policy
-
-Track:
-
-- extraction and enrichment source code
-- project documentation
-- handover documentation
-- dependency manifests
-- helper scripts
-
-Do not track:
-
-- parquet outputs
-- EPSS history dumps
-- local caches
-- virtual environments
-- logs
-- secrets or `.env` files
-
-This keeps the repository useful for collaboration without making normal Git
-operations depend on multi-GB binary data.
-
-## Plan for creating the research project
-
-### 1. Stabilize the handover data
-
-- Confirm the nine expected parquet outputs exist.
-- Keep generated data out of Git.
-- Document the provenance, known biases, and leakage risks for each source.
-- Treat the current extraction scripts as reproducibility material, not as the
-  main modeling code.
-
-### 2. Build the analysis dataset
-
-- Start from `cve_corpus.parquet` as the per-CVE base table.
-- Use `published` as the clock origin.
-- Join dated event sources:
-  - PoC dates
-  - Metasploit dates
-  - Nuclei dates
-  - CISA KEV dates
-  - Google 0-day dates
-- Define one or more event labels:
-  - time to first public weaponization signal
-  - time to PoC
-  - time to Metasploit
-  - time to Nuclei
-  - time to confirmed in-wild signal
-- Define a fixed snapshot date and right-censor CVEs with no observed event.
-
-### 3. Avoid temporal leakage
-
-- Use only features knowable at or near publication time for prediction.
-- Do not use snapshot-time feed-presence flags as predictors for historical
-  events.
-- Treat current CVE descriptions carefully because they may contain post-event
-  text such as KEV or active-exploitation mentions.
-- Use time-based train/test splitting, not random K-fold splitting.
-
-### 4. Run exploratory analysis first
-
-- Plot Kaplan-Meier curves for key event definitions.
-- Compare event timing by CVSS severity, CWE class, vendor/product family, and
-  ATT&CK tactic where available.
-- Quantify censoring and source dominance, especially PoC dominance.
-- Identify negative durations and decide whether to drop, floor, or analyze
-  them separately.
-
-### 5. Train baseline survival models
-
-- Start with simple, defensible baselines:
-  - Kaplan-Meier reference curves
-  - Cox proportional hazards
-  - random survival forest if available
-- Evaluate discrimination and calibration at fixed horizons:
-  - 7 days
-  - 30 days
-  - 90 days
-  - 180 days
-
-### 6. Add stronger ML models if time allows
-
-- Test learned text features from CVE descriptions only after addressing
-  leakage.
-- Compare deep survival models such as DeepSurv or DeepHit against classical
-  baselines.
-- Explore competing-risk or multi-state modeling for PoC to Metasploit to
-  Nuclei to KEV progression.
-
-### 7. Reconcile results against EPSS
-
-- Compare the survival model's multi-horizon predictions with EPSS.
-- Identify CVEs where EPSS is high but public weaponization is slow, and where
-  EPSS is low but weaponization is fast.
-- Frame EPSS as complementary: EPSS predicts exploitation probability in a
-  fixed 30-day window, while this project models weaponization timing.
-
-### 8. Produce final research outputs
-
-- A reproducible modeling dataset builder.
-- Locked train/test CVE ID splits.
-- Survival-analysis notebooks or scripts.
-- Evaluation tables and calibration plots.
-- A written methodology covering censoring, leakage, event definitions, source
-  bias, and limitations.
-
-## Quick start
-
-From the dataset folder:
-
-```bash
-cd dataset_extraction-20260608T210903Z-3-002/dataset_extraction
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python view_parquet.py --list
-```
-
-On Windows PowerShell, activate the environment with:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-## Modeling quick start
-
-From the repo root:
-
-```bash
-python -m pip install -e ".[dev]"
-temporal-exploit build-dataset --out-dir dataset_extraction-20260608T210903Z-3-002/dataset_extraction/out --artifact-dir artifacts --snapshot-date 2026-03-14
-pytest
-```
-
-Generated artifacts land in `artifacts/` (ignored by Git): `modeling_labels.parquet`,
-`publication_features.parquet`, and `manifest.json`. Methodology is documented in
-`docs/modeling_methodology.md`.
-
-## Main documentation
-
-Read these in order:
-
-1. `dataset_extraction-20260608T210903Z-3-002/dataset_extraction/temporal_exploit_prediction.md`
-2. `dataset_extraction-20260608T210903Z-3-002/dataset_extraction/handover/README.md`
-3. `dataset_extraction-20260608T210903Z-3-002/dataset_extraction/README.md`
-
+Large generated datasets (parquet outputs, EPSS dumps) are intentionally
+Git-ignored and handled as local or object-storage artifacts.
