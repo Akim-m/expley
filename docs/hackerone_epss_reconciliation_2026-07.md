@@ -84,6 +84,21 @@ re-run with two synthetic augments: an **oracle** (in-wild/KEV membership) moved
 oracle — the augment pathway works and the null is genuine (the flag is truly uninformative given the
 structural features), not a plumbing bug.
 
+## Appendix: full `ranked_cve_entries` table profile (363,064 CVEs)
+
+The full CVE-discovery analytics table was scraped rate-limit-safe (`scripts/hackerone_cve_table_scrape.py`,
+cursor-paginated, self-throttled to ~5.5 s/page, 7 self-absorbed 429s, 0 restarts;
+`scripts/hackerone_cve_table_profile.py` → `artifacts/hackerone_cve_table.parquet`, 5.1 MB, gitignored).
+Profile confirms it is **reference/EDA only, not a modelling signal:**
+- 363,064 rows = the full CVE universe; 338,015 (93.1 %) intersect the corpus.
+- **`reports_submitted_count` is 0 for 353,028 CVEs (97.2 %), ≤1 for 99.1 %** — bug-bounty activity is
+  concentrated in ~534 CVEs (≥10 reports; max 5,914). The signal is extremely sparse, snapshot-cumulative
+  (accumulates post-publication → leaky), and undated.
+- KEV overlap is trivially all 1,542 (the table lists every CVE), so it adds no in-wild information.
+
+Consistent with the disclosed-report finding: the table is a scanner/researcher-attention volume, not
+an exploitation signal. Kept as a local EDA artifact only.
+
 ## Do-not-re-attempt note
 
 HackerOne is now characterised (memory: `hackerone-hacktivity-checked`). It is **not** an in-wild
