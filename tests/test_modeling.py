@@ -503,7 +503,7 @@ def test_downcast_does_not_change_model_risk_scores():
     # the "no quality loss" proof: cox + xgb produce identical risk on the int8-
     # downcast frame vs the int64 frame (models convert to float -> identical floats).
     from temporal_exploit.modeling import (
-        _risk_scores, downcast_int_features, fit_cox, prepare_modeling_frame,
+        _risk_scores, fit_cox, prepare_modeling_frame,
     )
 
     rng = np.random.default_rng(0)
@@ -525,8 +525,6 @@ def test_downcast_does_not_change_model_risk_scores():
     frame_wide = frame.copy()
     for c in ("flag_a", "flag_b"):
         frame_wide[c] = frame_wide[c].astype("int64")        # force back to int64
-    feat_cols = [c for c in frame.columns if c not in
-                 ("cve_id", "published", "duration_days", "event_observed", "negative_duration_flag")]
     assert frame["flag_a"].dtype == np.int8                  # downcast applied
     m_small, m_wide = fit_cox(frame), fit_cox(frame_wide)
     r_small = _risk_scores(m_small, frame[list(m_small.feature_cols_)].astype(float), "cox")
