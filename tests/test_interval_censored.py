@@ -80,3 +80,31 @@ def test_bias_divergence_flags_batching():
     out = ic.bias_divergence(dur, ev, edges)
     assert set(out) >= {"max_abs_diff", "mean_abs_diff", "median_time_naive", "median_time_lifetable"}
     assert out["max_abs_diff"] >= 0.0
+
+
+def test_run_interval_censored_smoke(tmp_path):
+    # minimal artifact dir: a PoC per_signal frame + a publication feature matrix
+    art = tmp_path / "art"; (art / "merged").mkdir(parents=True)
+    n = 200
+    rng = np.random.default_rng(1)
+    # Spread published dates across the cutoff so the time split yields non-empty
+    # train and test partitions (a single constant date puts everything on one
+    # side of any cutoff and starves the other, crashing sklearn's predict_proba).
+    published = pd.to_datetime("2019-01-01", utc=True) + pd.to_timedelta(
+        rng.integers(0, 730, n), unit="D")
+    labels = pd.DataFrame({
+        "cve_id": [f"CVE-{i}" for i in range(n)],
+        "published": published,
+        "poc_duration_days": rng.integers(1, 400, n).astype(float),
+        "poc_observed": rng.integers(0, 2, n).astype(bool),
+        "poc_negative_duration_flag": [False] * n,
+    })
+    labels.to_parquet(art / "per_signal_labels.parquet", index=False)
+    pd.DataFrame({"cve_id": labels["cve_id"], "cvss_v3_base": rng.random(n) * 10}).to_parquet(
+        art / "publication_features.parquet", index=False)
+
+    from scripts.build_interval_censored import run_interval_censored
+    out = run_interval_censored(art, cutoff="2020-06-01")
+    assert set(out) >= {"n", "n_negative_excluded", "horizon_probs", "c_index", "bias"}
+    assert (art / "merged" / "interval_censored.json").exists()
+    assert (art / "merged" / "interval_censored_bias.png").exists()
