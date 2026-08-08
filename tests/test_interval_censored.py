@@ -82,6 +82,34 @@ def test_bias_divergence_flags_batching():
     assert out["max_abs_diff"] >= 0.0
 
 
+def test_concentration_profile_flags_clustering():
+    # value 7 holds 5/10 = 50% of records; single value covers 50%
+    vals = pd.Series([7, 7, 7, 7, 7, 1, 2, 3, 4, 5])
+    out = ic.concentration_profile(vals, ks=(1, 3))
+    assert out["n_distinct"] == 6
+    assert out["total"] == 10
+    assert out["n_values_for_50pct"] == 1          # one value already reaches 50%
+    assert abs(out["top1_share"] - 0.5) < 1e-9
+    assert abs(out["top3_share"] - 0.7) < 1e-9     # 7(x5)+two singletons = 7/10
+
+
+def test_concentration_profile_flat_distribution():
+    vals = pd.Series(list(range(10)))              # all distinct -> maximally flat
+    out = ic.concentration_profile(vals, ks=(1,))
+    assert out["n_distinct"] == 10
+    assert out["n_values_for_50pct"] == 5          # need 5 of 10 to reach 50%
+    assert abs(out["top1_share"] - 0.1) < 1e-9
+
+
+def test_indexing_lag_sensitivity_monotone():
+    # shifting durations earlier can only lower (never raise) S at a fixed horizon
+    dur = np.array([50.0, 100.0, 150.0, 200.0, 250.0])
+    ev = np.array([1, 1, 1, 1, 0])
+    out = ic.indexing_lag_sensitivity(dur, ev, lags=(0, 60), horizons=(90.0,))
+    assert out["S90_lag60"] <= out["S90_lag0"]     # earlier events -> more have fired by 90d
+    assert 0.0 <= out["S90_lag60"] <= 1.0
+
+
 def test_run_interval_censored_smoke(tmp_path):
     # minimal artifact dir: a PoC per_signal frame + a publication feature matrix
     art = tmp_path / "art"; (art / "merged").mkdir(parents=True)
@@ -92,10 +120,12 @@ def test_run_interval_censored_smoke(tmp_path):
     # side of any cutoff and starves the other, crashing sklearn's predict_proba).
     published = pd.to_datetime("2019-01-01", utc=True) + pd.to_timedelta(
         rng.integers(0, 730, n), unit="D")
+    poc_duration_days = rng.integers(1, 400, n).astype(float)
     labels = pd.DataFrame({
         "cve_id": [f"CVE-{i}" for i in range(n)],
         "published": published,
-        "poc_duration_days": rng.integers(1, 400, n).astype(float),
+        "poc_event_date": published + pd.to_timedelta(poc_duration_days, unit="D"),
+        "poc_duration_days": poc_duration_days,
         "poc_observed": rng.integers(0, 2, n).astype(bool),
         "poc_negative_duration_flag": [False] * n,
     })
@@ -105,6 +135,9 @@ def test_run_interval_censored_smoke(tmp_path):
 
     from scripts.build_interval_censored import run_interval_censored
     out = run_interval_censored(art, cutoff="2020-06-01")
-    assert set(out) >= {"n", "n_negative_excluded", "horizon_probs", "c_index", "bias"}
+    assert set(out) >= {
+        "n", "n_negative_excluded", "horizon_probs", "c_index",
+        "calendar_concentration", "duration_concentration", "indexing_lag_sensitivity",
+    }
     assert (art / "merged" / "interval_censored.json").exists()
     assert (art / "merged" / "interval_censored_bias.png").exists()
