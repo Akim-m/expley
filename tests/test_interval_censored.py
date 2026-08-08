@@ -121,12 +121,16 @@ def test_run_interval_censored_smoke(tmp_path):
     published = pd.to_datetime("2019-01-01", utc=True) + pd.to_timedelta(
         rng.integers(0, 730, n), unit="D")
     poc_duration_days = rng.integers(1, 400, n).astype(float)
+    poc_observed = rng.integers(0, 2, n).astype(bool)
+    # Real data: poc_event_date is NaT for censored (poc_observed == False) rows --
+    # mirror that here so the smoke test exercises the same assumption the runner relies on.
+    poc_event_date = (published + pd.to_timedelta(poc_duration_days, unit="D")).where(poc_observed, pd.NaT)
     labels = pd.DataFrame({
         "cve_id": [f"CVE-{i}" for i in range(n)],
         "published": published,
-        "poc_event_date": published + pd.to_timedelta(poc_duration_days, unit="D"),
+        "poc_event_date": poc_event_date,
         "poc_duration_days": poc_duration_days,
-        "poc_observed": rng.integers(0, 2, n).astype(bool),
+        "poc_observed": poc_observed,
         "poc_negative_duration_flag": [False] * n,
     })
     labels.to_parquet(art / "per_signal_labels.parquet", index=False)

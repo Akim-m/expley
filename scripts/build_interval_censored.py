@@ -31,6 +31,8 @@ def _cum_share_curve(values) -> tuple[np.ndarray, np.ndarray]:
     """Rank (1..n_distinct, most-common first) vs cumulative share of records."""
     vc = pd.Series(values).value_counts().sort_values(ascending=False)
     total = float(vc.sum())
+    if total == 0:
+        raise ValueError("_cum_share_curve: no records (empty input) — cannot compute shares")
     ranks = np.arange(1, len(vc) + 1)
     cum_share = vc.cumsum().to_numpy() / total
     return ranks, cum_share
@@ -75,6 +77,9 @@ def run_interval_censored(artifact_dir: Path, cutoff: str = "2024-01-01") -> dic
     dur = ev["poc_duration_days"].round().astype(int)
     calendar_concentration = ic.concentration_profile(cal)
     duration_concentration = ic.concentration_profile(dur)
+    # Full cohort (observed + right-censored), not just `ev` -- the KM curve underlying
+    # S(tau) needs the censored subjects as at-risk population, so this is not
+    # conditional on eventual PoC.
     lag = ic.indexing_lag_sensitivity(df["poc_duration_days"].to_numpy(float), df["poc_observed"].to_numpy(int))
 
     finding = (
@@ -86,7 +91,8 @@ def run_interval_censored(artifact_dir: Path, cutoff: str = "2024-01-01") -> dic
         f"batching does not bias aggregate time-to-PoC survival (naive-KM vs "
         f"grouped-life-table max |diff| = {bias['max_abs_diff']:.2e}). The residual "
         f"indexing-lag bias is bounded: S(90) moves from "
-        f"{lag['S90_lag0']:.2f} (lag=0) to {lag['S90_lag90']:.2f} (assumed 90-day lag)."
+        f"{lag['S90_lag0']:.2f} (lag=0) to {lag['S90_lag90']:.2f} (assumed 90-day lag) "
+        f"(indexing_lag_sensitivity S(τ) is over the full cohort incl. right-censored CVEs)."
     )
 
     (artifact_dir / "merged").mkdir(parents=True, exist_ok=True)
