@@ -38,3 +38,26 @@ def test_expand_person_period_rejects_nonpositive_duration():
 
 def test_horizon_bins_pinned():
     assert ic.HORIZON_BINS == (0.0, 7.0, 30.0, 90.0, 180.0, 365.0, 730.0, float("inf"))
+
+
+def test_discrete_time_recovers_hazard_and_is_monotone():
+    # Two bins, feature-free: bin 0 hazard ~0.1, bin 1 hazard ~0.5 by construction.
+    edges = (0.0, 10.0, 20.0, float("inf"))
+    rng = np.random.default_rng(0)
+    n = 4000
+    # everyone at risk through bin 0; 10% event in bin0, of survivors 50% in bin1
+    dur, ev = [], []
+    for _ in range(n):
+        if rng.random() < 0.1:
+            dur.append(5.0); ev.append(1)                 # event bin 0
+        elif rng.random() < 0.5:
+            dur.append(15.0); ev.append(1)                # event bin 1
+        else:
+            dur.append(25.0); ev.append(0)                # censored bin 2
+    features = pd.DataFrame({"x": np.zeros(n)})
+    m = ic.fit_discrete_time(np.array(dur), np.array(ev), features, edges)
+    S = m.survival_at(pd.DataFrame({"x": [0.0]}), horizons=(10.0, 20.0))[0]
+    assert 0.0 <= S[1] <= S[0] <= 1.0                     # monotone non-increasing
+    assert abs(S[0] - 0.9) < 0.05                          # S(10) ~ 1-0.1
+    r = m.risk_scores(pd.DataFrame({"x": [0.0]}))
+    assert 0.0 <= r[0] <= 1.0
