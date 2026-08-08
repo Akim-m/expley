@@ -25,3 +25,16 @@ def test_expand_person_period_event_and_censored():
     s1 = long[long["cvss"] == 5.0].sort_values("bin_idx")
     assert list(s1["bin_idx"]) == [0, 1, 2, 3]
     assert list(s1["y"]) == [0, 0, 0, 0]      # censored -> never fires
+
+
+def test_expand_person_period_rejects_nonpositive_duration():
+    edges = (0.0, 7.0, 30.0, float("inf"))
+    features = pd.DataFrame({"cvss": [9.8]})
+    with pytest.raises(ValueError):
+        ic.expand_person_period(np.array([0.0]), np.array([1]), features, edges)
+    with pytest.raises(ValueError):
+        ic.expand_person_period(np.array([-5.0]), np.array([1]), features, edges)
+
+
+def test_horizon_bins_pinned():
+    assert ic.HORIZON_BINS == (0.0, 7.0, 30.0, 90.0, 180.0, 365.0, 730.0, float("inf"))
