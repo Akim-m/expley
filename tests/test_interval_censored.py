@@ -61,3 +61,22 @@ def test_discrete_time_recovers_hazard_and_is_monotone():
     assert abs(S[0] - 0.9) < 0.05                          # S(10) ~ 1-0.1
     r = m.risk_scores(pd.DataFrame({"x": [0.0]}))
     assert 0.0 <= r[0] <= 1.0
+
+
+def test_grouped_life_table_hand_computed():
+    # edges (0,10,20,inf): bin0 has 2 events of 5 at risk; bin1 has 1 event of 3 at risk.
+    edges = (0.0, 10.0, 20.0, float("inf"))
+    dur = np.array([5.0, 5.0, 15.0, 25.0, 25.0])     # 2 events bin0, 1 event bin1, 2 censored bin2
+    ev = np.array([1, 1, 1, 0, 0])
+    surv = ic.grouped_life_table(dur, ev, edges)     # at edges 10 and 20
+    # S(10) = 1 - 2/5 = 0.6 ; S(20) = 0.6 * (1 - 1/3) = 0.4
+    assert np.allclose(surv, [0.6, 0.4], atol=1e-9)
+
+
+def test_bias_divergence_flags_batching():
+    edges = (0.0, 10.0, 20.0, float("inf"))
+    dur = np.array([5.0, 5.0, 15.0, 25.0, 25.0])
+    ev = np.array([1, 1, 1, 0, 0])
+    out = ic.bias_divergence(dur, ev, edges)
+    assert set(out) >= {"max_abs_diff", "mean_abs_diff", "median_time_naive", "median_time_lifetable"}
+    assert out["max_abs_diff"] >= 0.0
