@@ -416,6 +416,7 @@ def run_interval_censored(artifact_dir: Path, cutoff: str = "2024-01-01") -> dic
     artifact_dir = Path(artifact_dir)
     labels = pd.read_parquet(artifact_dir / "per_signal_labels.parquet")
     feats = pd.read_parquet(artifact_dir / "publication_features.parquet")
+    feats = feats.drop(columns=["published"], errors="ignore")  # 'published' lives on labels; dropping it avoids merge suffixes and keeps it out of feature_cols (it is a tz-aware datetime, not a model feature)
     df = labels.merge(feats, on="cve_id", how="inner")
     df["published"] = pd.to_datetime(df["published"], utc=True)
 
