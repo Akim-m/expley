@@ -46,12 +46,18 @@ publication-time feature matrix (`build_publication_features`, leakage-safe).
 
 **Two components.**
 
-1. **Turnbull NPMLE bias exhibit** — the nonparametric interval-censored survival curve (KM analogue
-   for interval data) computed with each PoC as the interval `[published, poc_first_seen]`, compared
-   against the naive exact-date KM. Output: the divergence between the two curves quantified
-   (median-time shift; max/area curve distance) and a figure. This is the "here is the bias" result.
-   *Negative-duration PoCs* (`poc_first_seen < published`, where lower > upper) are excluded from the
-   survival fit exactly as the existing baselines already reject negative durations — reported as a
+1. **Grouped interval-censored NPMLE bias exhibit** — the nonparametric interval-censored survival
+   curve computed with each PoC assigned to its **containing time-bin** `(loₖ, hiₖ]` (grouped
+   interval-censoring — this is what destroys within-bin batch-date exactness), compared against the
+   naive exact-date KM. *Why grouped, not `[published, poc_first_seen]`:* in duration terms the latter
+   is `[0, dᵢ]` for every CVE (nested-from-zero / all-left-censored), whose NPMLE collapses back to
+   approximately the naive estimate and does **not** correct the batch bias. Turnbull's NPMLE
+   specializes to the actuarial **life-table** estimator when every interval endpoint lies on a shared
+   grid (the bins), so the exhibit is a life-table-vs-naive-KM comparison — no fragile EM.
+   Output: the divergence between the two curves quantified (median-time shift; max/area curve
+   distance at the horizon grid) and a figure. This is the "here is the bias" result.
+   *Negative-duration PoCs* (`poc_first_seen < published`, where the duration is < 0) are excluded from
+   the survival fit exactly as the existing baselines already reject negative durations — reported as a
    count, not silently dropped, and carried into §4.1's exploit-before-disclosure framing instead.
 
 2. **Discrete-time hazard covariate model** — person-period expansion: one row per `(cve, interval)`
