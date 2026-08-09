@@ -23,6 +23,8 @@ import pandas as pd
 from lifelines.utils import concordance_index
 
 from temporal_exploit import interval_censored as ic
+from temporal_exploit.epss_features import epss_feature_columns
+from temporal_exploit.splits import make_time_split
 
 HORIZONS = (7.0, 30.0, 90.0, 180.0)
 
@@ -43,6 +45,9 @@ def run_interval_censored(artifact_dir: Path, cutoff: str = "2024-01-01") -> dic
     labels = pd.read_parquet(artifact_dir / "per_signal_labels.parquet")
     feats = pd.read_parquet(artifact_dir / "publication_features.parquet")
     feats = feats.drop(columns=["published"], errors="ignore")  # 'published' lives on labels; dropping it avoids merge suffixes and keeps it out of feature_cols (it is a tz-aware datetime, not a model feature)
+    # NO EPSS in training (standing project directive): epss_at_publication*
+    # columns are in-wild-predictor-derived and must never enter a model fit.
+    feats = feats.drop(columns=epss_feature_columns(feats.columns), errors="ignore")
     df = labels.merge(feats, on="cve_id", how="inner")
     df["published"] = pd.to_datetime(df["published"], utc=True)
 
@@ -50,8 +55,20 @@ def run_interval_censored(artifact_dir: Path, cutoff: str = "2024-01-01") -> dic
     df = df[~df["poc_negative_duration_flag"] & (df["poc_duration_days"] > 0)].reset_index(drop=True)
 
     feature_cols = [c for c in feats.columns if c != "cve_id"]
-    cut = pd.Timestamp(cutoff, tz="UTC")
-    train, test = df[df["published"] < cut], df[df["published"] >= cut]
+    assert not any(c.startswith("epss") for c in feature_cols), (
+        "EPSS features leaked into feature_cols (violates NO-EPSS-in-training directive)"
+    )
+
+    split = make_time_split(df, cutoff)                        # project-standard locked time split
+    train, test = split.train, split.test
+    if train.empty or test.empty:
+        raise ValueError(
+            f"empty train/test partition at cutoff {cutoff!r} (train={len(train)}, test={len(test)})"
+        )
+    if train["poc_observed"].nunique() < 2:
+        raise ValueError(
+            f"train partition at cutoff {cutoff!r} has <2 classes in poc_observed; cannot fit a hazard model"
+        )
 
     model = ic.fit_discrete_time(
         train["poc_duration_days"].to_numpy(float),
@@ -62,6 +79,12 @@ def run_interval_censored(artifact_dir: Path, cutoff: str = "2024-01-01") -> dic
     horizon_probs = {int(h): float(np.mean(1.0 - surv[:, j])) for j, h in enumerate(HORIZONS)}
     risk = model.risk_scores(test[feature_cols])
     c_index = float(concordance_index(test["poc_duration_days"], -risk, test["poc_observed"]))
+    c_index_note = (
+        "interval-censored discrete-time discrimination on the PoC-duration target "
+        "(positive-duration cohort), temporal split at "
+        f"{cutoff}; NOT a matched head-to-head vs the first-weaponization xgb "
+        "baseline (different target/population)."
+    )
 
     # Sanity-check sibling only: naive-KM vs grouped-life-table agree by construction
     # (both are estimators over the same grouped data), so this is ~0 regardless of
@@ -73,6 +96,8 @@ def run_interval_censored(artifact_dir: Path, cutoff: str = "2024-01-01") -> dic
     # calendar-date space vs duration space, restricted to actual (observed) events
     # since only those carry a real poc_event_date.
     ev = df[df["poc_observed"].astype(bool)]
+    ev = ev.dropna(subset=["poc_event_date"])  # defensive: a stray NaT among "observed" rows
+    # would otherwise desync calendar_concentration['total'] from duration_concentration['total']
     cal = pd.to_datetime(ev["poc_event_date"], utc=True).dt.normalize()
     dur = ev["poc_duration_days"].round().astype(int)
     calendar_concentration = ic.concentration_profile(cal)
@@ -115,6 +140,7 @@ def run_interval_censored(artifact_dir: Path, cutoff: str = "2024-01-01") -> dic
         "n_negative_excluded": n_neg,
         "horizon_probs": horizon_probs,
         "c_index": c_index,
+        "c_index_note": c_index_note,
         "calendar_concentration": calendar_concentration,
         "duration_concentration": duration_concentration,
         "indexing_lag_sensitivity": lag,

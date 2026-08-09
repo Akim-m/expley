@@ -40,6 +40,26 @@ def test_horizon_bins_pinned():
     assert ic.HORIZON_BINS == (0.0, 7.0, 30.0, 90.0, 180.0, 365.0, 730.0, float("inf"))
 
 
+def test_expand_person_period_preserves_object_and_ndarray_columns():
+    # Locks the vectorization equivalence for non-numeric feature dtypes: real
+    # feature frames can carry object columns (e.g. CWE id strings) or
+    # ndarray-valued cells (e.g. raw list columns); the vectorized .iloc[subj]
+    # expansion must not coerce, drop, or corrupt them.
+    edges = (0.0, 10.0, 20.0, float("inf"))
+    durations = np.array([5.0, 15.0])          # subject 0 -> bin 0 (1 row); subject 1 -> bin 1 (2 rows)
+    events = np.array([1, 0])
+    features = pd.DataFrame({
+        "cwe": ["CWE-79", "CWE-89"],                                     # object dtype
+        "cpe_vendors": [np.array(["acme"]), np.array(["foo", "bar"])],   # ndarray-valued cells
+    })
+    long = ic.expand_person_period(durations, events, features, edges)
+    assert long["cwe"].dtype == features["cwe"].dtype   # dtype preserved (object or pandas "str"), not coerced
+    assert list(long["cwe"]) == ["CWE-79", "CWE-89", "CWE-89"]
+    assert long["cpe_vendors"].iloc[0].tolist() == ["acme"]
+    assert long["cpe_vendors"].iloc[1].tolist() == ["foo", "bar"]
+    assert long["cpe_vendors"].iloc[2].tolist() == ["foo", "bar"]
+
+
 def test_discrete_time_recovers_hazard_and_is_monotone():
     # Two bins, feature-free: bin 0 hazard ~0.1, bin 1 hazard ~0.5 by construction.
     edges = (0.0, 10.0, 20.0, float("inf"))
