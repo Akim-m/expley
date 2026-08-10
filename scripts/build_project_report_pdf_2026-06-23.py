@@ -113,6 +113,166 @@ def make_table(data, col_widths=None, header=True, font=8.5):
 
 
 # ===========================================================================
+# REFERENCES — numbered [N], assigned in order of first appearance.
+# Every entry below was verified in 2026-06 against its DOI / arXiv ID / official
+# venue page (the verification trail is in the commit message). Nothing here is
+# invented: any claim for which no real source could be confirmed was reworded
+# rather than given a fabricated citation.
+# ===========================================================================
+REF = ParagraphStyle("Ref", parent=BODY, fontSize=8.6, leading=11.5,
+                     leftIndent=20, firstLineIndent=-20, spaceAfter=4)
+
+REFDB = {
+    # -- domain: exploit / vulnerability-exploitation prediction ----------
+    "epss-2021": 'J. Jacobs, S. Romanosky, B. Edwards, M. Roytman, and I. Adjerid. '
+        '"Exploit Prediction Scoring System (EPSS)." <i>Digital Threats: Research and '
+        'Practice</i>, 2(3):Article 20, 2021. doi:10.1145/3436242.',
+    "epss-v3-2023": 'J. Jacobs, S. Romanosky, O. Suciu, B. Edwards, and A. Sarabi. '
+        '"Enhancing Vulnerability Prioritization: Data-Driven Exploit Predictions with '
+        'Community-Driven Insights." In <i>2023 IEEE European Symposium on Security and '
+        'Privacy Workshops (EuroS&amp;PW)</i>, pp. 194&ndash;206, 2023. arXiv:2302.14172.',
+    "first-epss-model": 'FIRST.org EPSS Special Interest Group. "The EPSS Model." Forum of '
+        'Incident Response and Security Teams. https://www.first.org/epss/model (accessed 2026).',
+    "cisa-kev": 'Cybersecurity and Infrastructure Security Agency (CISA). "Known Exploited '
+        'Vulnerabilities Catalog." https://www.cisa.gov/known-exploited-vulnerabilities-catalog '
+        '(accessed 2026).',
+    "sabottke-2015": 'C. Sabottke, O. Suciu, and T. Dumitras. "Vulnerability Disclosure in the '
+        'Age of Social Media: Exploiting Twitter for Predicting Real-World Exploits." In '
+        '<i>24th USENIX Security Symposium (USENIX Security 15)</i>, 2015.',
+    "allodi-massacci-2014": 'L. Allodi and F. Massacci. "Comparing Vulnerability Severity and '
+        'Exploits Using Case-Control Studies." <i>ACM Transactions on Information and System '
+        'Security (TISSEC)</i>, 17(1):Article 1, 2014. doi:10.1145/2630069.',
+    "householder-cset-2020": 'A. D. Householder, J. Chrabaszcz, T. Novelly, D. Warren, and '
+        'J. M. Spring. "Historical Analysis of Exploit Availability Timelines." In <i>13th '
+        'USENIX Workshop on Cyber Security Experimentation and Test (CSET 20)</i>, 2020.',
+    "farris-vulcon-2018": 'K. A. Farris, A. Shah, S. Jajodia, R. Ganesan, and G. Cybenko. '
+        '"VULCON: A System for Vulnerability Prioritization, Mitigation, and Management." '
+        '<i>ACM Transactions on Privacy and Security (TOPS)</i>, 21(4):Article 16, 2018. '
+        'doi:10.1145/3196884.',
+    "epss-lookahead-2026": 'S. Paul. "How Good Is EPSS, Really? A Five-Year Empirical '
+        'Evaluation Correcting for Look-Ahead Bias." IEEE DataPort, 2026. doi:10.21227/bhhs-0994. '
+        '(Non-peer-reviewed dataset/report.)',
+    "vulncheck-kev-2025": 'VulnCheck, Inc. "VulnCheck KEV Surges to Track More than 3,600 Known '
+        'Exploited Vulnerabilities." Press release, May 2025. '
+        'https://www.vulncheck.com/press/vulncheck-kev-10000.',
+    "vulncheck-soe-2026": 'P. Garrity. "State of Exploitation: A Look at 2025 Vulnerability '
+        'Exploitation." VulnCheck, Jan. 2026. https://www.vulncheck.com/blog/state-of-exploitation-2026.',
+    # -- survival models --------------------------------------------------
+    "cox-1972": 'D. R. Cox. "Regression Models and Life-Tables." <i>Journal of the Royal '
+        'Statistical Society: Series B (Methodological)</i>, 34(2):187&ndash;202, 1972. '
+        'doi:10.1111/j.2517-6161.1972.tb00899.x.',
+    "kaplan-meier-1958": 'E. L. Kaplan and P. Meier. "Nonparametric Estimation from Incomplete '
+        'Observations." <i>Journal of the American Statistical Association</i>, 53(282):457&ndash;481, '
+        '1958. doi:10.1080/01621459.1958.10501452.',
+    "ishwaran-rsf-2008": 'H. Ishwaran, U. B. Kogalur, E. H. Blackstone, and M. S. Lauer. "Random '
+        'Survival Forests." <i>The Annals of Applied Statistics</i>, 2(3):841&ndash;860, 2008. '
+        'doi:10.1214/08-AOAS169.',
+    "katzman-deepsurv-2018": 'J. L. Katzman, U. Shaham, A. Cloninger, J. Bates, T. Jiang, and '
+        'Y. Kluger. "DeepSurv: Personalized Treatment Recommender System Using a Cox Proportional '
+        'Hazards Deep Neural Network." <i>BMC Medical Research Methodology</i>, 18:Article 24, 2018. '
+        'doi:10.1186/s12874-018-0482-1.',
+    "lee-deephit-2018": 'C. Lee, W. R. Zame, J. Yoon, and M. van der Schaar. "DeepHit: A Deep '
+        'Learning Approach to Survival Analysis with Competing Risks." In <i>Proceedings of the '
+        'AAAI Conference on Artificial Intelligence</i>, 32(1):2314&ndash;2321, 2018. '
+        'doi:10.1609/aaai.v32i1.11842.',
+    "chen-xgboost-2016": 'T. Chen and C. Guestrin. "XGBoost: A Scalable Tree Boosting System." '
+        'In <i>Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery '
+        'and Data Mining (KDD 16)</i>, pp. 785&ndash;794, 2016. doi:10.1145/2939672.2939785.',
+    "barnwal-xgboost-aft-2022": 'A. Barnwal, H. Cho, and T. Hocking. "Survival Regression with '
+        'Accelerated Failure Time Model in XGBoost." <i>Journal of Computational and Graphical '
+        'Statistics</i>, 31(4):1292&ndash;1302, 2022. doi:10.1080/10618600.2022.2067548.',
+    "hothorn-2006": 'T. Hothorn, P. Buhlmann, S. Dudoit, A. Molinaro, and M. J. van der Laan. '
+        '"Survival Ensembles." <i>Biostatistics</i>, 7(3):355&ndash;373, 2006. '
+        'doi:10.1093/biostatistics/kxj011.',
+    "simon-glmnet-2011": 'N. Simon, J. Friedman, T. Hastie, and R. Tibshirani. "Regularization '
+        'Paths for Cox\'s Proportional Hazards Model via Coordinate Descent." <i>Journal of '
+        'Statistical Software</i>, 39(5):1&ndash;13, 2011. doi:10.18637/jss.v039.i05.',
+    "farewell-cure-1982": 'V. T. Farewell. "The Use of Mixture Models for the Analysis of '
+        'Survival Data with Long-Term Survivors." <i>Biometrics</i>, 38(4):1041&ndash;1046, 1982. '
+        'doi:10.2307/2529885.',
+    "davidson-pilon-lifelines-2019": 'C. Davidson-Pilon. "lifelines: Survival Analysis in '
+        'Python." <i>Journal of Open Source Software</i>, 4(40):1317, 2019. doi:10.21105/joss.01317.',
+    # -- benchmarks & sample-size ----------------------------------------
+    "burk-2026": 'L. Burk, J. Zobolas, B. Bischl, A. Bender, M. N. Wright, and R. Sonabend. '
+        '"A Large-Scale Neutral Comparison Study of Survival Models on Low-Dimensional Data." '
+        '<i>Bioinformatics</i>, 42(5), 2026. arXiv:2406.04098; doi:10.1093/bioinformatics/btag186.',
+    "rossi-2025": 'I. Rossi, F. Sartori, C. Rollo, G. Birolo, P. Fariselli, and T. Sanavia. '
+        '"Beyond Cox Models: Assessing the Performance of Machine-Learning Methods in '
+        'Non-Proportional Hazards and Non-Linear Survival Analysis." arXiv:2504.17568, 2025.',
+    "concato-peduzzi-1995": 'P. Peduzzi, J. Concato, A. R. Feinstein, and T. R. Holford. '
+        '"Importance of Events per Independent Variable in Proportional Hazards Regression '
+        'Analysis. II. Accuracy and Precision of Regression Estimates." <i>Journal of Clinical '
+        'Epidemiology</i>, 48(12):1503&ndash;1510, 1995.',
+    "vittinghoff-mcculloch-2007": 'E. Vittinghoff and C. E. McCulloch. "Relaxing the Rule of Ten '
+        'Events per Variable in Logistic and Cox Regression." <i>American Journal of '
+        'Epidemiology</i>, 165(6):710&ndash;718, 2007. doi:10.1093/aje/kwk052.',
+    "survtrace-2022": 'Z. Wang and J. Sun. "SurvTRACE: Transformers for Survival Analysis with '
+        'Competing Events." In <i>Proceedings of the 13th ACM International Conference on '
+        'Bioinformatics, Computational Biology and Health Informatics (ACM-BCB)</i>, 2022. '
+        'arXiv:2110.00855.',
+    "tabpfn-2023": 'N. Hollmann, S. Muller, K. Eggensperger, and F. Hutter. "TabPFN: A '
+        'Transformer That Solves Small Tabular Classification Problems in a Second." In '
+        '<i>International Conference on Learning Representations (ICLR)</i>, 2023. (Extended as '
+        '"Accurate Predictions on Small Data with a Tabular Foundation Model," <i>Nature</i>, '
+        '637:319&ndash;326, 2025, doi:10.1038/s41586-024-08328-6.)',
+    "survivalpfn-2026": 'S.-A. Qi, V. Balazadeh, M. Cooper, R. Greiner, and R. G. Krishnan. '
+        '"SurvivalPFN: Amortizing Survival Prediction via In-Context Bayesian Inference." '
+        'arXiv:2605.15488, 2026.',
+    # -- evaluation & causal methods -------------------------------------
+    "uno-2011": 'H. Uno, T. Cai, M. J. Pencina, R. B. D\'Agostino, and L. J. Wei. "On the '
+        'C-Statistics for Evaluating Overall Adequacy of Risk Prediction Procedures with Censored '
+        'Survival Data." <i>Statistics in Medicine</i>, 30(10):1105&ndash;1117, 2011. doi:10.1002/sim.4154.',
+    "blanche-2013": 'P. Blanche, J.-F. Dartigues, and H. Jacqmin-Gadda. "Estimating and Comparing '
+        'Time-Dependent Areas Under Receiver Operating Characteristic Curves for Censored Event '
+        'Times with Competing Risks." <i>Statistics in Medicine</i>, 32(30):5381&ndash;5397, 2013. '
+        'doi:10.1002/sim.5958.',
+    "heagerty-zheng-2005": 'P. J. Heagerty and Y. Zheng. "Survival Model Predictive Accuracy and '
+        'ROC Curves." <i>Biometrics</i>, 61(1):92&ndash;105, 2005. doi:10.1111/j.0006-341X.2005.030814.x.',
+    "graf-1999": 'E. Graf, C. Schmoor, W. Sauerbrei, and M. Schumacher. "Assessment and Comparison '
+        'of Prognostic Classification Schemes for Survival Data." <i>Statistics in Medicine</i>, '
+        '18(17&ndash;18):2529&ndash;2545, 1999.',
+    "kattan-gerds-2018": 'M. W. Kattan and T. A. Gerds. "The Index of Prediction Accuracy: An '
+        'Intuitive Measure Useful for Evaluating Risk Prediction Models." <i>Diagnostic and '
+        'Prognostic Research</i>, 2:Article 7, 2018. doi:10.1186/s41512-018-0029-2.',
+    "vickers-elkin-2006": 'A. J. Vickers and E. B. Elkin. "Decision Curve Analysis: A Novel Method '
+        'for Evaluating Prediction Models." <i>Medical Decision Making</i>, 26(6):565&ndash;574, '
+        '2006. doi:10.1177/0272989X06295361.',
+    "vanderweele-ding-2017": 'T. J. VanderWeele and P. Ding. "Sensitivity Analysis in Observational '
+        'Research: Introducing the E-Value." <i>Annals of Internal Medicine</i>, 167(4):268&ndash;274, '
+        '2017. doi:10.7326/M16-2607.',
+    "robins-2000": 'J. M. Robins, M. A. Hernan, and B. Brumback. "Marginal Structural Models and '
+        'Causal Inference in Epidemiology." <i>Epidemiology</i>, 11(5):550&ndash;560, 2000. '
+        'doi:10.1097/00001648-200009000-00011.',
+    "fine-gray-1999": 'J. P. Fine and R. J. Gray. "A Proportional Hazards Model for the '
+        'Subdistribution of a Competing Risk." <i>Journal of the American Statistical '
+        'Association</i>, 94(446):496&ndash;509, 1999. doi:10.1080/01621459.1999.10474144.',
+    "aalen-johansen-1978": 'O. O. Aalen and S. Johansen. "An Empirical Transition Matrix for '
+        'Non-Homogeneous Markov Chains Based on Censored Observations." <i>Scandinavian Journal '
+        'of Statistics</i>, 5(3):141&ndash;150, 1978. JSTOR:4615704.',
+    "polsterl-2020": 'S. Polsterl. "scikit-survival: A Library for Time-to-Event Analysis Built on '
+        'Top of scikit-learn." <i>Journal of Machine Learning Research</i>, 21(212):1&ndash;6, 2020. '
+        'https://jmlr.org/papers/v21/20-729.html.',
+}
+
+_ref_order = []   # citation keys in order of first appearance
+_ref_num = {}     # key -> assigned reference number
+
+
+def cite(*keys):
+    """Return an inline IEEE-style marker like [3] or [3, 5] for the given keys,
+    registering each (in first-appearance order) for the References section."""
+    nums = []
+    for k in keys:
+        if k not in REFDB:
+            raise KeyError(f"unknown citation key: {k!r}")
+        if k not in _ref_num:
+            _ref_order.append(k)
+            _ref_num[k] = len(_ref_order)
+        nums.append(_ref_num[k])
+    return "[" + ",&nbsp;".join(str(n) for n in nums) + "]"
+
+
+# ===========================================================================
 # COVER
 # ===========================================================================
 story.append(Spacer(1, 50))
@@ -156,7 +316,9 @@ p(
     "This project is a <b>survival-analysis modeling layer</b> that predicts <b>when</b> a "
     "published CVE becomes publicly weaponized — a time-to-event problem — built on a "
     "pre-extracted, multi-source CVE timeline dataset (~338,000 CVEs). It is deliberately "
-    "positioned as a <b>complement</b> to EPSS, not a competitor: EPSS answers “will this be "
+    "positioned as a <b>complement</b> to EPSS "
+    + cite("epss-2021", "first-epss-model")
+    + ", not a competitor: EPSS answers “will this be "
     "exploited in the wild in the next 30 days?” as a fixed-window binary; this project "
     "characterizes the upstream <i>weaponization pipeline timing</i> (PoC &rarr; Metasploit / "
     "Nuclei &rarr; KEV / 0-day) and produces a calibrated time-to-event curve EPSS structurally "
@@ -167,8 +329,15 @@ bullets([
     "A leakage-safe dataset builder (four label sets: first-weaponization, per-signal, "
     "competing-risks, in-wild) over nine immutable handover parquets, with a feature-provenance "
     "audit trail and a content-hashed manifest.",
-    "Models spanning the survival toolbox: Kaplan-Meier, penalized Cox PH, Random Survival Forest, "
-    "GPU XGBoost-AFT, mixture-cure, DeepSurv/DeepHit, plus a competing-risks / Aalen-Johansen core.",
+    "Models spanning the survival toolbox: Kaplan-Meier "
+    + cite("kaplan-meier-1958")
+    + ", penalized Cox PH " + cite("cox-1972", "simon-glmnet-2011")
+    + ", Random Survival Forest " + cite("ishwaran-rsf-2008")
+    + ", GPU XGBoost-AFT " + cite("chen-xgboost-2016", "barnwal-xgboost-aft-2022")
+    + ", mixture-cure " + cite("farewell-cure-1982")
+    + ", DeepSurv/DeepHit " + cite("katzman-deepsurv-2018", "lee-deephit-2018")
+    + ", plus a competing-risks / Aalen-Johansen core "
+    + cite("fine-gray-1999", "aalen-johansen-1978") + ".",
     "Rare-event-appropriate evaluation: IPCW c-index with bootstrap CIs, time-dependent AUC(t), "
     "PR-AUC, Brier/IPA, decision-curve net-benefit, and a rolling-origin (walk-forward) backtest.",
     "A <b>causal layer</b> (adjusted Cox + stabilized IPW + E-values) characterizing what "
@@ -197,13 +366,16 @@ p(
     "the earliest dated signal across five sources; CVEs with no signal are right-censored at the "
     "snapshot date. This is classic right-censored survival analysis, and the framing is itself a "
     "contribution: the field overwhelmingly treats exploitation as repeated 30-day binary "
-    "classification (EPSS), while explicit time-to-event modeling of weaponization is "
-    "under-explored (CERT/SEI 2020; Farris 2017)."
+    "classification (EPSS) "
+    + cite("epss-v3-2023", "sabottke-2015", "allodi-massacci-2014")
+    + ", while explicit time-to-event modeling of weaponization is under-explored "
+    + cite("householder-cset-2020", "farris-vulcon-2018") + "."
 )
 key(
     "<b>CRITICAL framing caveat.</b> Of all observed first-weaponization events, <b>~97% are "
-    "public-PoC dates</b>. Only CISA KEV (<font face='Courier' size=8>kev_date_added</font>) and "
-    "Google Project Zero 0-day are true in-the-wild signals — historically a few hundred events. "
+    "public-PoC dates</b>. Only CISA KEV (<font face='Courier' size=8>kev_date_added</font>) "
+    + cite("cisa-kev")
+    + " and Google Project Zero 0-day are true in-the-wild signals — historically a few hundred events. "
     "<b>Any model trained on first-weaponization labels predicts time-to-public-tooling, NOT "
     "in-the-wild exploitation.</b> Keeping these two targets distinct is the backbone of every honest "
     "claim in this report."
@@ -275,9 +447,11 @@ bullets([
     "<b>Exclude snapshot-time presence flags</b> (<font face='Courier' size=8>vrs_presence</font>): "
     "whether a source <i>eventually</i> listed the CVE is knowledge from the future — a near-perfect "
     "leak. Kept in a separate, leakage-flagged parquet.",
-    "<b>Exclude snapshot-time EPSS.</b> Today's EPSS for an old CVE leaks the future (the literature "
-    "quantifies the look-ahead: 2023 efficiency collapses 60.9% &rarr; 11.1% when scored honestly). Only "
-    "the <i>first EPSS reading after publication</i> is used.",
+    "<b>Exclude snapshot-time EPSS.</b> Today's EPSS for an old CVE leaks the future (a recent "
+    "empirical re-evaluation quantifies the look-ahead: 2023 efficiency collapses 60.9% &rarr; 11.1% "
+    "when scored honestly "
+    + cite("epss-lookahead-2026")
+    + "). Only the <i>first EPSS reading after publication</i> is used.",
     "<b>Time-based splits, never random K-fold.</b> A model is only ever evaluated on CVEs published "
     "later than those it trained on.",
     "<b>The feature_provenance() audit trail.</b> Every emitted feature family gets a row with its "
@@ -341,8 +515,12 @@ p(
 h2("6.1 The classical backbone")
 bullets([
     "<b>Kaplan-Meier</b> — the unconditional reference and the null any model must beat.",
-    "<b>Cox PH (penalized, lifelines)</b> — the in-wild backbone. Ridge shrinkage handles the "
-    "borderline events-per-variable (~9.5 EPV); the penalizer is scaled by the event rate (undoing "
+    "<b>Cox PH (penalized, lifelines "
+    + cite("davidson-pilon-lifelines-2019")
+    + ")</b> — the in-wild backbone. Ridge shrinkage handles the "
+    "borderline events-per-variable (~9.5 EPV "
+    + cite("concato-peduzzi-1995", "vittinghoff-mcculloch-2007")
+    + "); the penalizer is scaled by the event rate (undoing "
     "~24&times; over-shrinkage on the rare target) with escalation on non-convergence.",
 ])
 h2("6.2 The challengers, and why Cox won for in-wild")
@@ -354,15 +532,21 @@ make_table([
     ["Mixture-cure", "overturned", "—", "harmful", "-0.27 @180d", "—"],
 ], col_widths=[1.7 * inch, 1.1 * inch, 0.5 * inch, 1.1 * inch, 0.9 * inch, 0.8 * inch])
 p(
-    "<font size=8>* sksurv Cox-loss GBM is O(n&sup2;) per tree — only tractable after subsampling, "
+    "<font size=8>* sksurv Cox-loss GBM "
+    + cite("hothorn-2006", "polsterl-2020")
+    + " is O(n&sup2;) per tree — only tractable after subsampling, "
     "which discards scarce events. Source: artifacts/inwild_headtohead.json "
     "(paired gbm&minus;cox AUC@90 = &minus;0.107, CI [&minus;0.154, &minus;0.061], excludes 0).</font>"
 )
 bullets([
     "<b>Why this matches the literature.</b> A neutral 34-dataset / 21-model benchmark finds <i>no "
-    "method significantly outperforms Cox</i> on tabular survival (Burk et al. 2026); boosting needs "
-    "&ge;600 events and transformers &ge;1,200 to beat Cox (Rossi et al. 2025). At ~396 events we are "
-    "firmly in Cox's territory.",
+    "method significantly outperforms Cox</i> on tabular survival "
+    + cite("burk-2026")
+    + "; in controlled ablations gradient boosting needs ~600 training samples (~420 events) and the "
+    "transformer / Cox-likelihood neural models ~1,200 samples (~840 events) to surpass Cox-type "
+    "linear models "
+    + cite("rossi-2025", "survtrace-2022")
+    + ". At ~396 events we are firmly in Cox's territory.",
     "<b>DeepSurv / DeepHit</b> are disqualified at this event count — which is also why the GPU sits "
     "idle for in-wild: Cox is CPU by design and is the best model.",
     "<b>XGBoost-AFT</b> is the headline ranker for the <i>abundant</i> first-weaponization target "
@@ -386,15 +570,22 @@ p(
     "measures the right things under heavy, potentially-informative censoring."
 )
 bullets([
-    "<b>IPCW c-index + bootstrap CIs.</b> The truncated-at-&tau; variant equals Uno's C under "
-    "administrative censoring; bootstrap CIs + paired deltas vs Cox replace single point estimates.",
-    "<b>Time-dependent AUC(t) with IPCW.</b> Discrimination at each fixed horizon, reweighting rather "
+    "<b>IPCW c-index + bootstrap CIs.</b> The truncated-at-&tau; variant equals Uno's C "
+    + cite("uno-2011")
+    + " under administrative censoring; bootstrap CIs + paired deltas vs Cox replace single point estimates.",
+    "<b>Time-dependent AUC(t) with IPCW "
+    + cite("blanche-2013", "heagerty-zheng-2005")
+    + ".</b> Discrimination at each fixed horizon, reweighting rather "
     "than dropping censored rows.",
     "<b>PR-AUC over ROC-AUC.</b> Under &lt;1% imbalance ROC-AUC looks great while the model is useless "
     "on the minority; PR-AUC exposes the true positive yield.",
-    "<b>Brier / IPA for calibration.</b> IPA = scaled Brier vs the train-KM null — does the "
+    "<b>Brier / IPA for calibration "
+    + cite("graf-1999", "kattan-gerds-2018")
+    + ".</b> IPA = scaled Brier vs the train-KM null — does the "
     "<i>absolute</i> probability beat the base rate?",
-    "<b>Decision-curve net-benefit.</b> Measured: the in-wild model beats both treat-all and "
+    "<b>Decision-curve net-benefit "
+    + cite("vickers-elkin-2006")
+    + ".</b> Measured: the in-wild model beats both treat-all and "
     "treat-none across the realistic 0.1&ndash;3% threshold band "
     "(artifacts/inwild_decision_curve.json) — useful, but modestly.",
     "<b>Rolling-origin (walk-forward) backtest.</b> Each origin trains only on what was knowable then "
@@ -445,7 +636,9 @@ key(
     "possible <i>data is scarce</i> — so weak first-weap ranking is target noise, not scarcity. Each "
     "head is limited by a different thing, and neither limit is the model. Corroborated three ways: "
     "every alternative model measured &le; Cox prospectively; ~9.5 EPV says the remedy is "
-    "penalization (done), not a bigger model; neutral benchmarks need 600&ndash;1,200 events to beat Cox."
+    "penalization (done), not a bigger model; neutral benchmarks need many hundreds of events "
+    "(roughly 600&ndash;1,200 training samples) before ML or transformer models beat Cox "
+    + cite("burk-2026", "rossi-2025") + "."
 )
 
 # ===========================================================================
@@ -454,8 +647,9 @@ key(
 h1("9. VulnCheck Wiring — Raising the Ceiling")
 p(
     "Because the ceiling is data-limited, the highest-leverage action is more / earlier in-wild "
-    "<i>labels</i>. The VulnCheck KEV catalog (~173% larger than CISA KEV, ~27 days earlier, using "
-    "first-reported-<i>evidence</i> dates) was fetched and wired end-to-end."
+    "<i>labels</i>. The VulnCheck KEV catalog (~173% larger than CISA KEV, ~27 days earlier "
+    + cite("vulncheck-kev-2025")
+    + ", using first-reported-<i>evidence</i> dates) was fetched and wired end-to-end."
 )
 image("docs/figures/fig_vulncheck_lift.png",
       "Figure 5. VulnCheck lift on a 70/30 in-wild split. Adding VulnCheck takes test events "
@@ -504,8 +698,11 @@ story.append(PageBreak())
 h1("12. Causal Characterization — What <i>Accelerates</i> Weaponization")
 p(
     "Beyond prediction, a causal layer asks which CVE properties <i>cause</i> faster weaponization. "
-    "It uses an adjusted Cox + stabilized inverse-probability weighting with overlap/positivity "
-    "diagnostics and the VanderWeele-Ding E-value (unmeasured-confounding robustness). Confounders "
+    "It uses an adjusted Cox + stabilized inverse-probability weighting "
+    + cite("robins-2000")
+    + " with overlap/positivity diagnostics and the VanderWeele-Ding E-value "
+    + cite("vanderweele-ding-2017")
+    + " (unmeasured-confounding robustness). Confounders "
     "are pre-treatment common causes only — deliberately not the CVSS components that <i>define</i> a "
     "treatment. Outcome = time-to-first-weaponization (n=313,847; 147,048 events). "
     "Source: artifacts/merged/causal_characterization.json; docs/causal_and_patch_race_2026-06.md."
@@ -537,7 +734,9 @@ p(
 )
 image("docs/figures/fig_patch_race.png",
       "Figure 9. Left: ~⅓ of weaponizations beat CVE publication — and our 28.6% first-weap rate "
-      "independently matches VulnCheck's reported 28.96% of 2025 KEVs, an external validation of the "
+      "independently matches VulnCheck's reported 28.96% of 2025 KEVs "
+      + cite("vulncheck-soe-2026")
+      + ", an external validation of the "
       "label pipeline. Right: the race is bimodal — in coordinated-disclosure OSS the fix lands a "
       "median 14 days before the CVE (defenders win ~99.5%); 0-days are the mirror (100% exploited "
       "before patch). Source: artifacts/merged/patch_race.json.")
@@ -554,8 +753,9 @@ key(
 h1("14. Label Completeness — the False-Censoring Gap")
 p(
     "The in-wild model right-censors every uncataloged CVE as “never exploited.” How many of those "
-    "are actually exploited? Using EPSS (FIRST's calibrated P(exploited in 30d), trained on "
-    "exploitation telemetry) as a semi-independent oracle quantifies the gap. "
+    "are actually exploited? Using EPSS (FIRST's calibrated P(exploited in 30d) "
+    + cite("epss-v3-2023", "first-epss-model")
+    + ", trained on exploitation telemetry) as a semi-independent oracle quantifies the gap. "
     "Source: artifacts/merged/label_completeness.json; docs/label_completeness_2026-06.md."
 )
 image("docs/figures/fig_label_funnel.png",
@@ -589,7 +789,9 @@ make_table([
 ], col_widths=[0.3 * inch, 2.5 * inch, 2.4 * inch, 1.3 * inch])
 p(
     "<b>Documented dead-ends not to revisit:</b> mixture-cure, RSF/GBM/deep nets, stacked transfer, "
-    "any recalibration, TabPFN/SurvivalPFN at this scale, and aggregate per-vendor/CWE forecasting "
+    "any recalibration, TabPFN/SurvivalPFN "
+    + cite("tabpfn-2023", "survivalpfn-2026")
+    + " at this scale, and aggregate per-vendor/CWE forecasting "
     "(counts measure the reporting apparatus, not attackers)."
 )
 
@@ -670,6 +872,22 @@ make_table([
     ["transition_safe_post_poc", "5", "opt-in", "post-PoC clock origin"],
     ["snapshot_leakage", "4", "NEVER", "kept separate for audit only"],
 ], col_widths=[2.2 * inch, 1.1 * inch, 1.1 * inch, 2.1 * inch])
+
+# ===========================================================================
+# REFERENCES  (rendered last, after every cite() call has registered)
+# ===========================================================================
+story.append(PageBreak())
+h1("References")
+p(
+    "Each source below was verified against its DOI, arXiv identifier, or official venue page "
+    "during preparation of this report (2026-06); none is auto-generated or unverified. "
+    "Citations are numbered in order of first appearance. Method papers ground the survival / "
+    "evaluation / causal machinery; domain references ground the exploitation-timing and EPSS / "
+    "KEV claims."
+)
+for _i, _k in enumerate(_ref_order, 1):
+    story.append(Paragraph(f"[{_i}]&nbsp;&nbsp;{REFDB[_k]}", REF))
+story.append(Spacer(1, 6))
 
 # ===========================================================================
 # Build
